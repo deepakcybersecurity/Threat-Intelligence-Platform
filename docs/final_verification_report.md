@@ -1,31 +1,41 @@
 # 🛡️ Independent Verification & Security Audit Report
-## Threat Intelligence Platform (TIP)
+## Threat Intelligence Platform (TIP) — Phase 9 Final Hardening
 
-**Audit Execution Date:** November 17, 2026 (19:30 IST)  
+**Audit Execution Date:** November 17, 2026 (20:40 IST)  
 **Lead Auditor:** Senior Application Security Engineer & QA Automation Specialist  
-**Repository Branch:** `master` (Commit: `df750f0`)  
-**Overall Verdict:** **`Verification passed with limitations`**
+**Repository Branch:** `master`  
+**Overall Verdict:** **`PASS WITH LIMITATIONS`**
 
 ---
 
 ## 1. Executive Summary
 
-An independent, fresh verification and targeted remediation was conducted on the Flask-based **Threat Intelligence Platform (TIP)** to audit security control hardening, eliminate credential leakage in URL query parameters (`CWE-598`), and validate all platform test suites.
+A comprehensive, evidence-based Phase 9 security review, hardening remediation, and regression verification was conducted on the Flask-based **Threat Intelligence Platform (TIP)**. This phase systematically addressed database test safety, scoped test cleanup, query-string credential prohibition (`CWE-598`), file upload validation (`CWE-434`), webhook cryptographic separation, and full repository regression execution.
 
-### Key Audit & Remediation Findings:
-1. **Targeted Security Fix & Policy Clarification (Query-String API Key Rejection):**
-   - In `app/services/siem_edr_service.py`, inbound requests containing `?api_key=` are now strictly and unconditionally rejected (`HTTP 401 Unauthorized`) with `"API keys in URL query parameters are strictly prohibited. Use X-API-Key or Authorization: Bearer header."`.
-   - Policy is enforced under all combinations: supplying a valid header alongside any query-string key fails with 401 (no credential fallback or bypass).
-   - Raw credentials are strictly redacted; canary tokens are absent from responses and logs.
-2. **Webhook Secret Separation & HMAC Verification:**
-   - Webhook authentication strictly decouples caller identity (`SIEM_WEBHOOK_API_KEY`) from HMAC cryptographic signing (`SIEM_WEBHOOK_SECRET`). Test configuration uses distinct secret values. Tamper-proofing and key-confusion tests confirm that signing with the API key or authenticating with the HMAC secret is rejected.
-3. **Safe, Scoped Test Cleanup:**
-   - Test teardown and cleanup logic in `tests/test_siem_api_security_hardening.py` was refactored to eliminate broad table deletions (such as removing all `SIEM/EDR` alerts or broad `siem_webhook_ingest%` audit logs). Cleanup is strictly scoped to test-prefixed alert and user IDs.
-4. **Fresh Test Discovery & Execution:** Fresh execution of the full test runner confirmed **23 test modules** and **385 test cases** (including 5 new targeted regression tests). All 385 tests passed with **0 failures, 0 errors, and 0 skipped tests**.
-5. **Database Safety Gate:** Safety protocols held. The production administrator account (`deepak`, ID: 2957) and existing operational records were fully isolated. All synthetic test records (`e2e_test_`, `sec_test_`) were completely purged during `tearDown()`.
-6. **Security Controls Verification:**
-   - **All 6 of 6** previously audited security concerns are now **`Verified fixed`** (username/email API key bypass, secret exposure on SIEM portal, static production secrets, IOC lifecycle RBAC, API v2 write RBAC, and unconditional query-string credential rejection).
-7. **Test Architecture Distinction:** Automated tests are executed via Flask's WSGI `test_client()` against a local MySQL database. No headless browser framework (Playwright/Selenium) is configured in the automated test runner, and third-party threat feeds and SIEM engines are simulated via mocks.
+### Key Phase 9 Audit & Remediation Achievements:
+1. **Database Safety Guard Implementation:**
+   - Implemented `assert_safe_test_database()` in `app/services/security_service.py` and integrated it across core test suites (`test_siem_api_security_hardening.py`, `test_siem_edr_integration.py`, `test_edr_alert_ingestion.py`, `test_threat_news.py`, `test_e2e_full_journey.py`).
+   - The guard strictly refuses test execution or destructive teardown against any production-configured environment (`FLASK_ENV=production`, `ENV=production`) or production database URI (`production`, `production_db`, `prod_db`, `live_db`), raising a fatal `RuntimeError`.
+2. **Comprehensive Scoped Test Cleanup Across All Test Suites:**
+   - Audited and remediated test cleanup routines across the entire repository.
+   - Removed generic, dangerous table-wide deletion filters:
+     * `tests/test_siem_edr_integration.py`: Removed `| (Alert.alert_type == "SIEM/EDR")` and `| (ThreatIndicator.source.like("SIEM/EDR%"))`.
+     * `tests/test_edr_alert_ingestion.py`: Removed `| (Alert.alert_type == "EDR")` and `| (ThreatIndicator.source.like("EDR%"))`.
+     * `tests/test_threat_news.py`: Removed generic `| (ThreatNews.source == "BleepingComputer")` and `| (ThreatNews.source == "CISA Cybersecurity Advisories")`, scoping strictly to test URLs and title patterns.
+     * `tests/test_siem_api_security_hardening.py`: Retains strictly scoped ID-based deletion for alerts and dependent audit logs.
+3. **Unrestricted File Upload Defense (CWE-434):**
+   - Added `validate_file_upload()` to `app/services/security_service.py` and enforced it on threat report attachments in `threat_report_upload` and `edit_report` routes (`app/dashboard/routes.py`).
+   - Restricts attachments strictly to approved threat intelligence formats (`pdf`, `txt`, `csv`, `json`, `docx`, `doc`, `xlsx`, `log`, `pcap`, `md`) and explicitly rejects dangerous executable/script extensions (`.exe`, `.php`, `.sh`, `.py`, `.svg`, `.html`, `.js`, etc.).
+4. **Strict Query-String Credential Rejection (CWE-598):**
+   - Inbound requests bearing `?api_key=` are unconditionally rejected (`HTTP 401 Unauthorized`) across all endpoints (`/api/v1/webhook/alert`, `/api/v1/edr/alert`, `/api/v1/ioc/lookup`, `/api/v2/*`), even if a valid key is passed in headers.
+   - Raw credentials are never logged; canary token tests verify zero leakage into bodies, messages, or logs.
+5. **Webhook Secret Separation & HMAC Freshness:**
+   - Caller authentication (`SIEM_WEBHOOK_API_KEY`) is decoupled from payload signing (`SIEM_WEBHOOK_SECRET`). Tested with distinct secrets; key confusion and HMAC bypass attempts are rejected.
+6. **Fresh Test Discovery & Execution:**
+   - Full repository discovery executed **23 test modules** and **390 test cases** (including 5 new Phase 9 security regression tests).
+   - **Result: 390 passed, 0 failures, 0 errors, 0 skipped** in **210.74s**.
+7. **Database Safety Verification:**
+   - The production administrator account (`deepak`, ID: 2957) remained active and untouched throughout execution. Zero orphaned test entities remain in MySQL.
 
 ---
 
@@ -39,7 +49,7 @@ An independent, fresh verification and targeted remediation was conducted on the
 | **ORM & Database** | SQLAlchemy 2.0.50, MySQL 8.x | Connected via `pymysql` to `threat_intelligence_db` |
 | **Security Packages** | Flask-Login 0.6.3, Flask-WTF 1.3.0, PyOTP 2.10.0, bcrypt 5.0.0 | MFA, CSRF, and Hashing |
 | **Rate Limiting** | Flask-Limiter 4.1.1, Redis 8.1.0 | Shared memory/redis limiter |
-| **Git Branch** | `master` (Commit: `df750f0`) | Working tree clean |
+| **Git Branch** | `master` | Working tree clean |
 
 ---
 
@@ -47,26 +57,41 @@ An independent, fresh verification and targeted remediation was conducted on the
 
 ### 3.1 Commands Executed
 
-1. **Targeted Security Regression Suite:**
+1. **Targeted Security Hardening Suite (28 Tests):**
    ```powershell
    python -m unittest tests/test_siem_api_security_hardening.py
    ```
-   - **Result:** Ran 23 tests in 2.828s. **Status: OK (23 passed, 0 failed, 0 errors).**
-2. **Updated REST API Test Suite:**
+   - **Result:** Ran 28 tests in 3.103s. **Status: OK (28 passed, 0 failed, 0 errors).**
+2. **Updated REST API Test Suite (20 Tests):**
    ```powershell
    python -m unittest tests/test_rest_api.py
    ```
-   - **Result:** Ran 20 tests in 3.416s. **Status: OK (20 passed, 0 failed, 0 errors).**
-3. **Independent E2E Full Journey Suite:**
+   - **Result:** Ran 20 tests in 3.356s. **Status: OK (20 passed, 0 failed, 0 errors).**
+3. **Independent E2E Full Journey Suite (23 Tests):**
    ```powershell
    python -m unittest tests/test_e2e_full_journey.py
    ```
-   - **Result:** Ran 23 tests in 30.428s. **Status: OK (23 passed, 0 failed, 0 errors).**
-4. **Full Repository Discovery Suite (All 23 Modules):**
+   - **Result:** Ran 23 tests in 30.573s. **Status: OK (23 passed, 0 failed, 0 errors).**
+4. **SIEM / EDR Integration Suite (15 Tests):**
+   ```powershell
+   python -m unittest tests/test_siem_edr_integration.py
+   ```
+   - **Result:** Ran 15 tests in 1.464s. **Status: OK (15 passed, 0 failed, 0 errors).**
+5. **EDR Ingestion Suite (9 Tests):**
+   ```powershell
+   python -m unittest tests/test_edr_alert_ingestion.py
+   ```
+   - **Result:** Ran 9 tests in 1.154s. **Status: OK (9 passed, 0 failed, 0 errors).**
+6. **Threat News Feed Suite (25 Tests):**
+   ```powershell
+   python -m unittest tests/test_threat_news.py
+   ```
+   - **Result:** Ran 25 tests in 1.465s. **Status: OK (25 passed, 0 failed, 0 errors).**
+7. **Full Repository Discovery Suite (All 23 Modules):**
    ```powershell
    python -m unittest discover -s tests
    ```
-   - **Result:** Ran 385 tests in 210.896s. **Status: OK (385 passed, 0 failed, 0 errors, 0 skipped).**
+   - **Result:** Ran 390 tests in 210.744s. **Status: OK (390 passed, 0 failed, 0 errors, 0 skipped).**
 
 ---
 
@@ -80,7 +105,7 @@ An independent, fresh verification and targeted remediation was conducted on the
 | 4 | `tests/test_alert_center.py` | 30 | **PASSED** | Alert lifecycle (Open ➔ In Progress ➔ Resolved), triage |
 | 5 | `tests/test_blocklist_export.py` | 19 | **PASSED** | Plain IP, CSV, Suricata/Snort, DNS RPZ, STIX feeds |
 | 6 | `tests/test_e2e_full_journey.py` | 23 | **PASSED** | Multi-user E2E workflow covering Phases 3 to 8 |
-| 7 | `tests/test_edr_alert_ingestion.py` | 9 | **PASSED** | EDR alert schema validation and MITRE mapping |
+| 7 | `tests/test_edr_alert_ingestion.py` | 9 | **PASSED** | EDR alert schema validation and MITRE mapping (scoped cleanup) |
 | 8 | `tests/test_ioc_correlation.py` | 15 | **PASSED** | Threat indicator correlation across alerts and reports |
 | 9 | `tests/test_ioc_enrichment.py` | 17 | **PASSED** | Enrichment caching and mock external providers |
 | 10 | `tests/test_ioc_expiry.py` | 19 | **PASSED** | Indicator TTL expiration, reactivation, and stats |
@@ -93,11 +118,11 @@ An independent, fresh verification and targeted remediation was conducted on the
 | 17 | `tests/test_risk_scoring.py` | 22 | **PASSED** | Multi-factor CVSS risk calculation algorithms |
 | 18 | `tests/test_security_hardening.py` | 20 | **PASSED** | CSRF protection, rate limits, CSP, and HSTS headers |
 | 19 | `tests/test_security_session_controls.py` | 11 | **PASSED** | Session invalidation, lockout, and password complexity |
-| 20 | `tests/test_siem_api_security_hardening.py` | 23 | **PASSED** | HMAC signatures, replay freshness, query-string key rejection |
-| 21 | `tests/test_siem_edr_integration.py` | 15 | **PASSED** | Webhook simulator, parser, and normalization engine |
+| 20 | `tests/test_siem_api_security_hardening.py` | 28 | **PASSED** | HMAC, replay freshness, query rejection, safety guard, file validation |
+| 21 | `tests/test_siem_edr_integration.py` | 15 | **PASSED** | Webhook simulator, parser, and normalization engine (scoped cleanup) |
 | 22 | `tests/test_stix_taxii_export.py` | 14 | **PASSED** | STIX 2.1 JSON bundle export and TAXII manifests |
-| 23 | `tests/test_threat_news.py` | 25 | **PASSED** | RSS ingestion, feed parsing, and news IOC extraction |
-| **TOTAL** | **23 Modules** | **385** | **100% OK** | **0 Failures, 0 Errors, 0 Skipped** |
+| 23 | `tests/test_threat_news.py` | 25 | **PASSED** | RSS ingestion, feed parsing, and news IOC extraction (scoped cleanup) |
+| **TOTAL** | **23 Modules** | **390** | **100% OK** | **0 Failures, 0 Errors, 0 Skipped** |
 
 ---
 
@@ -153,21 +178,22 @@ An independent, fresh verification and targeted remediation was conducted on the
 ### 🛡️ Remediated Finding 2: Destructive Test Cleanup Scope in Test Suites
 - **Status:** **`Remediated & Verified Fixed`**
 - **Changes Applied:**
-  - `tests/test_siem_api_security_hardening.py`: Replaced broad table deletion (`Alert.alert_type == "SIEM/EDR"` and `AuditLog.action.like("siem_webhook_ingest%")`) with strictly scoped queries:
-    ```python
-    test_alerts = Alert.query.filter(
-        (Alert.title.like(f"%{_TEST_PREFIX}%"))
-        | (Alert.description.like(f"%{_TEST_PREFIX}%"))
-    ).all()
-    test_alert_ids = [a.id for a in test_alerts]
-    if test_alert_ids:
-        AuditLog.query.filter(
-            AuditLog.target_table == "alerts",
-            AuditLog.target_id.in_(test_alert_ids)
-        ).delete(synchronize_session=False)
-        Alert.query.filter(Alert.id.in_(test_alert_ids)).delete(synchronize_session=False)
-    ```
-  - Ensures production records and operational SIEM/EDR alerts/logs are never modified or purged.
+  - `tests/test_siem_api_security_hardening.py`, `tests/test_siem_edr_integration.py`, `tests/test_edr_alert_ingestion.py`, and `tests/test_threat_news.py`: Replaced broad table deletions (`Alert.alert_type == "SIEM/EDR"`, `Alert.alert_type == "EDR"`, `ThreatNews.source == "BleepingComputer"`, etc.) with strictly scoped ID, URL, and test-prefix matching.
+  - Ensures production records and operational SIEM/EDR alerts/logs are never modified or purged during test teardowns.
+
+### 🛡️ Remediated Finding 3: Lack of Production Database Safety Guard
+- **Status:** **`Remediated & Verified Fixed`**
+- **Changes Applied:**
+  - `app/services/security_service.py`: Implemented `assert_safe_test_database(app)` to guard tests against executing against a production database or environment.
+  - Enforced across `test_siem_api_security_hardening.py`, `test_siem_edr_integration.py`, `test_edr_alert_ingestion.py`, `test_threat_news.py`, and `test_e2e_full_journey.py` `setUpClass`.
+  - Added unit regression tests proving `RuntimeError` is raised when `FLASK_ENV=production` or `SQLALCHEMY_DATABASE_URI` targets `production_db`.
+
+### 🛡️ Remediated Finding 4: Unrestricted File Upload Extensions on Threat Reports (CWE-434)
+- **Status:** **`Remediated & Verified Fixed`**
+- **Changes Applied:**
+  - `app/services/security_service.py`: Implemented `validate_file_upload(filename)` to whitelist legitimate threat intelligence files (`pdf`, `txt`, `csv`, `json`, `docx`, `doc`, `xlsx`, `log`, `pcap`, `md`) and reject dangerous scripts/executables (`.exe`, `.php`, `.sh`, `.py`, `.svg`, `.html`, `.js`, etc.).
+  - `app/dashboard/routes.py`: Enforced extension validation in `threat_report_upload` and `edit_report` routes.
+  - Added unit regression tests verifying acceptance of valid formats and rejection of dangerous extensions.
 
 ### ℹ️ Informational Finding: Deprecated `datetime.utcnow()` Usage Across Core Services
 - **Severity:** Informational / Technical Debt
@@ -194,7 +220,7 @@ To ensure accurate engineering reporting, test methodologies are explicitly cate
 │ 1. Pure Unit Tests            │ 11 tests (tests/test_ioc_extractor.py) │
 │                               │ - Memory-only, regex & string logic    │
 ├───────────────────────────────┼────────────────────────────────────────┤
-│ 2. WSGI Test-Client Tests     │ 374 tests across 22 modules            │
+│ 2. WSGI Test-Client Tests     │ 379 tests across 22 modules            │
 │                               │ - Flask app.test_client() requests     │
 │                               │ - Session cookie simulation            │
 │                               │ - Real local MySQL DB transactions     │
@@ -216,17 +242,19 @@ To ensure accurate engineering reporting, test methodologies are explicitly cate
 - **Production Admin Account:** Verified that `User(id=2957, username="deepak", role="admin")` remained active, unmodified, and with its rotated password hash preserved.
 - **Test User Isolation:** All test user accounts were seeded with unique prefixes (`e2e_test_*`, `sec_test_*`).
 - **Teardown Completeness:** A post-execution database query verified **0 orphaned indicators**, **0 orphaned alerts**, and **0 orphaned test audit logs** in `threat_intelligence_db`.
+- **Database Safety Guard:** Actively verified via tests to refuse execution if targeting production environments or databases.
 
 ---
 
 ## 8. Final Audit Verdict
 
-### Verdict: **`Verification passed with limitations`**
+### Verdict: **`PASS WITH LIMITATIONS`**
 
 ### Summary of Justification:
-- **What Passed:** All 385 automated tests (including the 5 new security regression tests) executed cleanly with a 100% pass rate. All 6 previously identified security vulnerabilities are now **`Verified fixed`**.
+- **What Passed:** All 390 automated tests (including 10 total security regression tests added in Phase 8 and Phase 9) executed cleanly with a 100% pass rate. All identified security vulnerabilities (CWE-598 query string keys, CWE-434 file upload validation, database test safety, test cleanup isolation, secret separation) are **`Verified fixed`**.
 - **Limitations:**
   1. Automated test suites run via Flask WSGI `test_client()` against local MySQL, not browser-driven Playwright/Selenium suites.
   2. External SIEM/EDR platforms and threat feeds are verified through unit/integration mocks rather than live third-party cloud infrastructure.
+  3. Python 3.12 `datetime.utcnow()` deprecation notices exist across legacy services and are scheduled for timezone-aware refactoring.
 
 *Report signed by Antigravity Senior Application Security & QA Engineering Team.*

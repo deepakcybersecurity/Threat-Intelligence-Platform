@@ -36,6 +36,8 @@ class TestEdrAlertIngestion(unittest.TestCase):
         cls.app.config["WTF_CSRF_ENABLED"] = False
         cls.app.config["SIEM_WEBHOOK_API_KEY"] = "test-edr-secret-key-2026"
         cls.client = cls.app.test_client()
+        from app.services.security_service import assert_safe_test_database
+        assert_safe_test_database(cls.app)
 
     def setUp(self):
         self.app_context = self.app.app_context()
@@ -62,28 +64,33 @@ class TestEdrAlertIngestion(unittest.TestCase):
         self.app_context.pop()
 
     def _cleanup(self):
-        # Delete test alerts
+        # Scoped cleanup: delete only test alerts created by this suite
         test_alerts = Alert.query.filter(
             (Alert.title.like("%[EDR%"))
-            | (Alert.title.like("%CrowdStrike%"))
-            | (Alert.title.like("%Defender%"))
+            | (Alert.title.like("%CrowdStrike Falcon%"))
+            | (Alert.title.like("%Microsoft Defender%"))
             | (Alert.title.like("%SentinelOne%"))
-            | (Alert.alert_type == "EDR")
         ).all()
-        for a in test_alerts:
-            db.session.delete(a)
+        test_alert_ids = [a.id for a in test_alerts]
+        if test_alert_ids:
+            from app.models import AuditLog
+            AuditLog.query.filter(
+                AuditLog.target_table == "alerts",
+                AuditLog.target_id.in_(test_alert_ids)
+            ).delete(synchronize_session=False)
+            for a in test_alerts:
+                db.session.delete(a)
 
         # Delete test indicators
         test_indicators = ThreatIndicator.query.filter(
-            (ThreatIndicator.indicator_value.in_([
+            ThreatIndicator.indicator_value.in_([
                 "198.51.100.77",
                 "203.0.113.88",
                 "c2-edr-beacon.evil.com",
                 "http://198.51.100.77/beacon.ps1",
                 "44d88612fea8a8f36de82e1278abb02f44d88612fea8a8f36de82e1278abb02f",
                 "a1b2c3d4e5f60718293a4b5c6d7e8f90",
-            ]))
-            | (ThreatIndicator.source.like("EDR%"))
+            ])
         ).all()
         for ind in test_indicators:
             ind.reports.clear()

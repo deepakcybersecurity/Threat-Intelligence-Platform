@@ -188,6 +188,8 @@ class TestThreatNewsModule(unittest.TestCase):
         cls.app.config["TESTING"] = True
         cls.app.config["WTF_CSRF_ENABLED"] = False
         cls.client = cls.app.test_client()
+        from app.services.security_service import assert_safe_test_database
+        assert_safe_test_database(cls.app)
 
     def setUp(self):
         self.app_context = self.app.app_context()
@@ -225,7 +227,7 @@ class TestThreatNewsModule(unittest.TestCase):
         self.app_context.pop()
 
     def _cleanup(self):
-        # Remove test news articles and test indicators created in tests
+        # Scoped cleanup: Remove ONLY test news articles and test indicators created in tests
         test_articles = ThreatNews.query.filter(
             (ThreatNews.source.like("Mock%"))
             | (ThreatNews.title.like("TEST_%"))
@@ -234,8 +236,13 @@ class TestThreatNewsModule(unittest.TestCase):
             | (ThreatNews.title.like("Security Alert:%"))
             | (ThreatNews.title.like("Nation-State%"))
             | (ThreatNews.title.like("CVE-2026-9999%"))
-            | (ThreatNews.source == "BleepingComputer")
-            | (ThreatNews.source == "CISA Cybersecurity Advisories")
+            | (ThreatNews.title.like("%Nippon Columbia%"))
+            | (ThreatNews.title.like("%State-Sponsored Hackers Exploit Zero-Day%"))
+            | (ThreatNews.title.like("%CISA Advisory AA26-284A%"))
+            | (ThreatNews.source_url.like("%nippon-columbia-incident%"))
+            | (ThreatNews.source_url.like("%vpn-zero-day-exploit%"))
+            | (ThreatNews.source_url.like("%aa26-284a%"))
+            | (ThreatNews.source_url.like("%example.com%"))
         ).all()
         for a in test_articles:
             db.session.delete(a)

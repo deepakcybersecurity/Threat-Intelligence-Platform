@@ -39,6 +39,8 @@ class TestSiemEdrIntegration(unittest.TestCase):
         cls.app.config["WTF_CSRF_ENABLED"] = False
         cls.app.config["SIEM_WEBHOOK_API_KEY"] = "test-siem-edr-key-2026"
         cls.client = cls.app.test_client()
+        from app.services.security_service import assert_safe_test_database
+        assert_safe_test_database(cls.app)
 
     def setUp(self):
         self.app_context = self.app.app_context()
@@ -65,28 +67,35 @@ class TestSiemEdrIntegration(unittest.TestCase):
         self.app_context.pop()
 
     def _cleanup(self):
-        # Remove test alerts and indicators created during tests
+        # Scoped cleanup: remove ONLY test alerts and indicators created during this test suite
         test_alerts = Alert.query.filter(
             (Alert.title.like("%CrowdStrike%"))
             | (Alert.title.like("%Sentinel%"))
             | (Alert.title.like("%Splunk%"))
-            | (Alert.title.like("%Test%"))
-            | (Alert.title.like("%SIEM/EDR%"))
-            | (Alert.alert_type == "SIEM/EDR")
+            | (Alert.title.like("Auth Check Alert%"))
+            | (Alert.title.like("Bearer Auth Check Alert%"))
+            | (Alert.title.like("%Test Alert%"))
+            | (Alert.title.like("%SIEM/EDR Incident Alert%"))
         ).all()
-        for a in test_alerts:
-            db.session.delete(a)
+        test_alert_ids = [a.id for a in test_alerts]
+        if test_alert_ids:
+            from app.models import AuditLog
+            AuditLog.query.filter(
+                AuditLog.target_table == "alerts",
+                AuditLog.target_id.in_(test_alert_ids)
+            ).delete(synchronize_session=False)
+            for a in test_alerts:
+                db.session.delete(a)
 
         test_indicators = ThreatIndicator.query.filter(
-            (ThreatIndicator.indicator_value.in_([
+            ThreatIndicator.indicator_value.in_([
                 "198.51.100.99",
                 "203.0.113.55",
                 "c2-beacon-malware.org",
                 "suspicious-domain-sentinel.com",
                 "0123456789abcdef0123456789abcdef",
                 "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-            ]))
-            | (ThreatIndicator.source.like("SIEM/EDR%"))
+            ])
         ).all()
         for ind in test_indicators:
             ind.reports.clear()

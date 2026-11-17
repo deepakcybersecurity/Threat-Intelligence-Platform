@@ -17,6 +17,7 @@ from datetime import datetime, timezone
 import hashlib
 import hmac
 import json
+import os
 import time
 import unittest
 
@@ -38,6 +39,8 @@ class TestSiemApiSecurityHardening(unittest.TestCase):
         cls.app.config["SIEM_WEBHOOK_API_KEY"] = "distinct-webhook-api-key-header-2026"
         cls.app.config["SIEM_WEBHOOK_SECRET"] = "distinct-signing-hmac-secret-2026"
         cls.client = cls.app.test_client()
+        from app.services.security_service import assert_safe_test_database
+        assert_safe_test_database(cls.app)
 
     def setUp(self):
         self.ctx = self.app.app_context()
@@ -742,6 +745,109 @@ class TestSiemApiSecurityHardening(unittest.TestCase):
         )
         self.assertEqual(resp_wrong_key.status_code, 401)
         self.assertEqual(resp_wrong_key.get_json()["error"], "Unauthorized")
+
+    # =========================================================================
+    # 10. PHASE 9 SECURITY HARDENING & DATABASE SAFETY REGRESSION TESTS
+    # =========================================================================
+
+    def test_database_safety_guard_blocks_production_env(self):
+        """Verifies that assert_safe_test_database refuses execution when FLASK_ENV=production."""
+        from app.services.security_service import assert_safe_test_database
+        orig = os.environ.get("FLASK_ENV")
+        try:
+            os.environ["FLASK_ENV"] = "production"
+            with self.assertRaises(RuntimeError) as ctx:
+                assert_safe_test_database(self.app)
+            self.assertIn("FLASK_ENV=production", str(ctx.exception))
+        finally:
+            if orig is not None:
+                os.environ["FLASK_ENV"] = orig
+            else:
+                os.environ.pop("FLASK_ENV", None)
+
+    def test_database_safety_guard_blocks_production_database_uri(self):
+        """Verifies that assert_safe_test_database refuses execution against production DB name."""
+        from app.services.security_service import assert_safe_test_database
+        from unittest.mock import MagicMock
+        mock_app = MagicMock()
+        mock_app.config = {
+            "TESTING": True,
+            "SQLALCHEMY_DATABASE_URI": "mysql+pymysql://root:pass@10.0.0.1:3306/production_db"
+        }
+        with self.assertRaises(RuntimeError) as ctx:
+            assert_safe_test_database(mock_app)
+        self.assertIn("production database", str(ctx.exception).lower())
+
+    def test_production_and_admin_records_preserved_by_cleanup(self):
+        """Verifies that production admin (deepak) and non-test records are never deleted or modified."""
+        deepak = User.query.filter_by(username="deepak").first()
+        self.assertIsNotNone(deepak)
+        self.assertEqual(deepak.role, "admin")
+        self.assertTrue(deepak.is_active)
+
+        # Trigger cleanup
+        self._cleanup()
+
+        # Re-verify deepak is untouched
+        deepak_after = User.query.filter_by(username="deepak").first()
+        self.assertIsNotNone(deepak_after)
+        self.assertEqual(deepak_after.id, deepak.id)
+        self.assertEqual(deepak_after.role, "admin")
+        self.assertTrue(deepak_after.is_active)
+
+    def test_query_string_prohibition_on_edr_and_ioc_endpoints(self):
+        """
+        Verifies that ?api_key= is rejected with 401 across multiple API endpoints
+        (EDR alert ingest, IOC lookup, Alerts CRUD) even when valid X-API-Key is provided.
+        """
+        valid_key = self.analyst.api_key
+        # 1. EDR Alert endpoint with query string
+        resp1 = self.client.post(
+            f"/api/v1/edr/alert?api_key={valid_key}",
+            json={"DetectionName": "Test", "Severity": "Low"},
+            headers={"X-API-Key": valid_key, "Content-Type": "application/json"}
+        )
+        self.assertEqual(resp1.status_code, 401)
+        self.assertIn("prohibited", resp1.get_json()["message"].lower())
+
+        # 2. IOC lookup endpoint with query string
+        resp2 = self.client.get(
+            f"/api/v1/ioc/lookup?indicator=198.51.100.1&api_key={valid_key}",
+            headers={"X-API-Key": valid_key}
+        )
+        self.assertEqual(resp2.status_code, 401)
+        self.assertIn("prohibited", resp2.get_json()["message"].lower())
+
+        # 3. Alerts endpoint with query string
+        resp3 = self.client.get(
+            f"/api/v2/alerts?api_key={valid_key}",
+            headers={"X-API-Key": valid_key}
+        )
+        self.assertEqual(resp3.status_code, 401)
+        self.assertIn("prohibited", resp3.get_json()["message"].lower())
+
+    def test_file_upload_validation_rejects_dangerous_extensions(self):
+        """Verifies validate_file_upload allows safe threat intel formats and rejects dangerous extensions."""
+        from app.services.security_service import validate_file_upload
+
+        # Safe formats
+        safe_files = ["threat_report.pdf", "indicators.json", "hashes.csv", "sample.txt", "network.pcap", "notes.md"]
+        for sf in safe_files:
+            ok, err = validate_file_upload(sf)
+            self.assertTrue(ok, f"Expected {sf} to be accepted, got: {err}")
+            self.assertIsNone(err)
+
+        # Dangerous formats
+        dangerous_files = ["backdoor.exe", "webshell.php", "script.sh", "exploit.svg", "payload.html", "macro.py", "script.js"]
+        for df in dangerous_files:
+            ok, err = validate_file_upload(df)
+            self.assertFalse(ok, f"Expected {df} to be rejected")
+            self.assertIn("prohibited", err.lower())
+
+        # Missing extension
+        ok, err = validate_file_upload("noextensionfile")
+        self.assertFalse(ok)
+        self.assertIn("valid extension", err.lower())
 
 
 if __name__ == "__main__":

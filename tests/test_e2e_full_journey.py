@@ -54,6 +54,8 @@ class TestE2EFullJourney(unittest.TestCase):
         cls.app.config["SIEM_WEBHOOK_SECRET"] = "e2e-strong-siem-secret-key-2026"
         cls.app.config["SIEM_WEBHOOK_REQUIRE_SIGNATURE"] = False
         cls.client = cls.app.test_client()
+        from app.services.security_service import assert_safe_test_database
+        assert_safe_test_database(cls.app)
 
     def setUp(self):
         self.ctx = self.app.app_context()

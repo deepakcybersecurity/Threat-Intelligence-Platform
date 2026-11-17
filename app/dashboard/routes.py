@@ -39,7 +39,11 @@ from app.services.news_service import (
     extract_news_iocs,
 )
 from app.services.audit_service import log_action as _audit_log
-from app.services.security_service import sanitize_text, validate_password_complexity
+from app.services.security_service import (
+    sanitize_text,
+    validate_password_complexity,
+    validate_file_upload,
+)
 from werkzeug.security import generate_password_hash, check_password_hash
 from app.services.mitre_service import (
     get_all_tactics,
@@ -594,6 +598,11 @@ def threat_report_upload():
         filename = None
 
         if uploaded_file and uploaded_file.filename:
+            is_valid_file, file_err = validate_file_upload(uploaded_file.filename)
+            if not is_valid_file:
+                flash(file_err, "danger")
+                return render_template("threat-report-upload.html")
+
             filename = secure_filename(uploaded_file.filename)
             save_path = os.path.join(
                 current_app.config["UPLOAD_FOLDER"],
@@ -726,6 +735,10 @@ def edit_report(report_id):
         uploaded_file = request.files.get("report_file")
 
         if uploaded_file and uploaded_file.filename:
+            is_valid_file, file_err = validate_file_upload(uploaded_file.filename)
+            if not is_valid_file:
+                flash(file_err, "danger")
+                return redirect(url_for("dashboard.edit_report", report_id=report.id))
 
             filename = secure_filename(uploaded_file.filename)
 

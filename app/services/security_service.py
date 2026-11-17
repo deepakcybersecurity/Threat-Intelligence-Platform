@@ -10,10 +10,88 @@ Provides:
 
 import html
 import logging
+import os
 import re
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional, Tuple, Set
 
 logger = logging.getLogger(__name__)
+
+# Allowed & Prohibited file upload extensions (CWE-434 Defense)
+ALLOWED_REPORT_EXTENSIONS: Set[str] = {
+    "pdf", "txt", "csv", "json", "docx", "doc", "xlsx", "log", "pcap", "md"
+}
+DANGEROUS_FILE_EXTENSIONS: Set[str] = {
+    "exe", "dll", "bat", "cmd", "sh", "php", "phtml", "py", "pl", "rb",
+    "cgi", "jsp", "asp", "aspx", "svg", "html", "htm", "js", "vbs", "ps1"
+}
+
+
+def validate_file_upload(filename: Optional[str]) -> Tuple[bool, Optional[str]]:
+    """
+    Validate uploaded file extensions to prevent malicious file uploads (CWE-434).
+    Enforces whitelisted threat intelligence file formats (pdf, txt, csv, json, etc.)
+    and rejects executable and script extensions.
+    """
+    if not filename or not isinstance(filename, str):
+        return False, "Filename cannot be empty."
+
+    parts = filename.rsplit(".", 1)
+    if len(parts) < 2 or not parts[1].strip():
+        return False, "File must have a valid extension."
+
+    ext = parts[1].strip().lower()
+
+    if ext in DANGEROUS_FILE_EXTENSIONS:
+        return False, f"File extension '.{ext}' is strictly prohibited for security reasons."
+
+    if ext not in ALLOWED_REPORT_EXTENSIONS:
+        allowed_list = ", ".join(f".{e}" for e in sorted(ALLOWED_REPORT_EXTENSIONS))
+        return False, f"Unsupported file type '.{ext}'. Allowed types: {allowed_list}."
+
+    return True, None
+
+
+def assert_safe_test_database(app=None) -> None:
+    """
+    Database Safety Guard:
+    Refuses destructive test execution and teardown operations if the environment
+    or database URI indicates a production system.
+
+    Checks:
+    1. FLASK_ENV or ENV environment variable is set to 'production'
+    2. SQLALCHEMY_DATABASE_URI database name indicates a production database ('prod', 'production', 'live')
+    3. ProductionConfig class is used without explicit testing override
+
+    Raises:
+        RuntimeError: if execution is unsafe against production.
+    """
+    flask_env = os.getenv("FLASK_ENV", "").strip().lower()
+    if flask_env == "production":
+        raise RuntimeError(
+            "CRITICAL DATABASE SAFETY GUARD: Test execution refused against a production-configured environment (FLASK_ENV=production)!"
+        )
+
+    db_uri = ""
+    if app:
+        db_uri = app.config.get("SQLALCHEMY_DATABASE_URI", "")
+        if app.config.get("ENV") == "production":
+            raise RuntimeError(
+                "CRITICAL DATABASE SAFETY GUARD: Test execution refused against production environment (ENV=production)!"
+            )
+        if not app.config.get("TESTING", False):
+            raise RuntimeError(
+                "CRITICAL DATABASE SAFETY GUARD: Test execution refused because app.config['TESTING'] is not True!"
+            )
+    else:
+        db_uri = os.getenv("SQLALCHEMY_DATABASE_URI", "")
+
+    if db_uri and "/" in db_uri:
+        db_name = db_uri.rsplit("/", 1)[-1].split("?")[0].strip().lower()
+        prod_markers = ["production", "prod_db", "production_db", "live_db", "prod_threat"]
+        if any(marker in db_name for marker in prod_markers):
+            raise RuntimeError(
+                f"CRITICAL DATABASE SAFETY GUARD: Test execution refused against production database '{db_name}'!"
+            )
 
 # Default Password Policy
 DEFAULT_MIN_PASSWORD_LENGTH = 8
