@@ -515,6 +515,79 @@ class TestSiemApiSecurityHardening(unittest.TestCase):
             else:
                 os.environ.pop("SIEM_WEBHOOK_API_KEY", None)
 
+    # =========================================================================
+    # 8. QUERY STRING API KEY REJECTION REGRESSION TESTS (CWE-598)
+    # =========================================================================
+
+    def test_valid_header_api_key_authenticates(self):
+        """Verifies valid X-API-Key header authenticates an authorized request (200)."""
+        resp = self.client.get(
+            "/api/v2/indicators",
+            headers={"X-API-Key": self.analyst.api_key}
+        )
+        self.assertEqual(resp.status_code, 200)
+        data = resp.get_json()
+        self.assertIn("items", data)
+
+    def test_invalid_header_api_key_rejected(self):
+        """Verifies invalid X-API-Key header is rejected with 401 Unauthorized."""
+        resp = self.client.get(
+            "/api/v2/indicators",
+            headers={"X-API-Key": "completely_invalid_key_99999"}
+        )
+        self.assertEqual(resp.status_code, 401)
+        data = resp.get_json()
+        self.assertFalse(data.get("success", True))
+        self.assertEqual(data.get("error"), "Unauthorized")
+
+    def test_query_string_api_key_alone_rejected_even_if_valid(self):
+        """Verifies query-string ?api_key= alone is rejected with 401 even if key is valid."""
+        secret_sample = self.analyst.api_key
+        resp = self.client.get(f"/api/v2/indicators?api_key={secret_sample}")
+        self.assertEqual(resp.status_code, 401)
+        data = resp.get_json()
+        self.assertFalse(data.get("success", True))
+        self.assertEqual(data.get("error"), "Unauthorized")
+        # Ensure error message states rejection policy
+        self.assertIn("rejected", data.get("message", "").lower())
+        # Ensure secret itself is NOT leaked in the response body
+        self.assertNotIn(secret_sample, resp.get_data(as_text=True))
+
+    def test_header_precedence_and_no_fallback_to_query_string(self):
+        """
+        Verifies policy when both header and query-string are provided:
+        - Valid header authenticates without relying on query-string.
+        - Invalid header fails (401) and does NOT silently fall back to valid query-string.
+        """
+        # Case A: Valid header + invalid query string -> Authenticates via valid header (200)
+        resp_a = self.client.get(
+            "/api/v2/indicators?api_key=invalid_query_key_123",
+            headers={"X-API-Key": self.analyst.api_key}
+        )
+        self.assertEqual(resp_a.status_code, 200)
+
+        # Case B: Invalid header + valid query string -> Fails (401), does NOT fall back to query string!
+        resp_b = self.client.get(
+            f"/api/v2/indicators?api_key={self.analyst.api_key}",
+            headers={"X-API-Key": "invalid_header_key_456"}
+        )
+        self.assertEqual(resp_b.status_code, 401)
+        self.assertFalse(resp_b.get_json().get("success", True))
+
+    def test_secrets_redacted_from_error_responses_and_logs(self):
+        """Verifies that secrets passed in query string or headers are never exposed in error text or logs."""
+        canary_secret = "CANARY_SECRET_DO_NOT_LEAK_789xyz"
+        with self.assertLogs("app.services.siem_edr_service", level="WARNING") as log_capture:
+            resp = self.client.get(f"/api/v2/indicators?api_key={canary_secret}")
+            self.assertEqual(resp.status_code, 401)
+            response_text = resp.get_data(as_text=True)
+            self.assertNotIn(canary_secret, response_text)
+
+        # Verify log output does not include the raw secret
+        for log_entry in log_capture.output:
+            self.assertNotIn(canary_secret, log_entry)
+            self.assertIn("query parameter", log_entry.lower())
+
 
 if __name__ == "__main__":
     unittest.main()

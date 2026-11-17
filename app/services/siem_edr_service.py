@@ -102,7 +102,8 @@ def authenticate_api_request(req: Any) -> Tuple[bool, str, Optional[Dict[str, An
     Inspects:
     1. X-API-Key header
     2. Authorization: Bearer <key> header
-    3. Query parameter ?api_key=<key> (deprecated with migration notice)
+    
+    Query parameters (?api_key=) are explicitly rejected for security (CWE-598).
 
     Validates against:
     - Configured SIEM_WEBHOOK_API_KEY (constant-time compare)
@@ -123,13 +124,17 @@ def authenticate_api_request(req: Any) -> Tuple[bool, str, Optional[Dict[str, An
         elif len(parts) == 1:
             api_key = parts[0].strip()
 
-    # 3. Query parameter fallback (deprecated for security; logged if used)
-    if not api_key and "api_key" in req.args:
-        api_key = req.args.get("api_key", "").strip()
-        if api_key:
-            logger.warning(
-                "Insecure API key transmitted in URL query parameter (?api_key=). "
-                "Migrate to X-API-Key or Authorization: Bearer header."
+    # 3. Query parameter ?api_key= is explicitly rejected (Security Hardening: CWE-598)
+    if "api_key" in req.args:
+        logger.warning(
+            "Rejected API key transmission in URL query parameter (?api_key=). "
+            "Clients must supply credentials via X-API-Key or Authorization headers."
+        )
+        if not api_key:
+            return (
+                False,
+                "API keys in URL query parameters are rejected for security. Use X-API-Key or Authorization: Bearer header.",
+                None,
             )
 
     if not api_key:

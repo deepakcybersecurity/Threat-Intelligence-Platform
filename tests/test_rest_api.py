@@ -256,10 +256,13 @@ class TestRestApiV2(unittest.TestCase):
         resp = self.client.get("/api/v2/indicators", headers=headers)
         self.assertEqual(resp.status_code, 200)
 
-    def test_query_param_api_key(self):
-        """Verifies api_key query parameter fallback works."""
+    def test_query_param_api_key_rejected(self):
+        """Verifies api_key query parameter is rejected for security (CWE-598)."""
         resp = self.client.get(f"/api/v2/indicators?api_key={self.analyst.api_key}")
-        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.status_code, 401)
+        data = resp.get_json()
+        self.assertFalse(data.get("success", True))
+        self.assertIn("rejected", data.get("message", "").lower())
 
     # =========================================================================
     # 2. OPENAPI DOCUMENTATION ENDPOINT
