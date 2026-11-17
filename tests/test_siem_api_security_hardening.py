@@ -35,8 +35,8 @@ class TestSiemApiSecurityHardening(unittest.TestCase):
         cls.app = create_app()
         cls.app.config["TESTING"] = True
         cls.app.config["WTF_CSRF_ENABLED"] = False
-        cls.app.config["SIEM_WEBHOOK_API_KEY"] = "strong-siem-secret-test-key-2026"
-        cls.app.config["SIEM_WEBHOOK_SECRET"] = "strong-siem-secret-test-key-2026"
+        cls.app.config["SIEM_WEBHOOK_API_KEY"] = "distinct-webhook-api-key-header-2026"
+        cls.app.config["SIEM_WEBHOOK_SECRET"] = "distinct-signing-hmac-secret-2026"
         cls.client = cls.app.test_client()
 
     def setUp(self):
@@ -51,16 +51,27 @@ class TestSiemApiSecurityHardening(unittest.TestCase):
         self.ctx.pop()
 
     def _cleanup(self):
+        """Scrupulously scoped cleanup: deletes ONLY test-prefixed entities created by this suite."""
         db.session.rollback()
 
-        # Delete test alerts
-        Alert.query.filter(
+        # 1. Scope alert deletion strictly to test-prefixed alerts created by this suite
+        test_alerts = Alert.query.filter(
             (Alert.title.like(f"%{_TEST_PREFIX}%"))
             | (Alert.description.like(f"%{_TEST_PREFIX}%"))
-            | (Alert.alert_type == "SIEM/EDR")
-        ).delete(synchronize_session=False)
+        ).all()
+        test_alert_ids = [a.id for a in test_alerts]
 
-        # Delete test indicators
+        if test_alert_ids:
+            # Delete audit logs specifically referencing these test alerts
+            AuditLog.query.filter(
+                AuditLog.target_table == "alerts",
+                AuditLog.target_id.in_(test_alert_ids)
+            ).delete(synchronize_session=False)
+
+            # Delete the test alerts
+            Alert.query.filter(Alert.id.in_(test_alert_ids)).delete(synchronize_session=False)
+
+        # 2. Scope indicator deletion strictly to test-prefixed indicators
         inds = ThreatIndicator.query.filter(
             ThreatIndicator.indicator_value.like(f"{_TEST_PREFIX}%")
         ).all()
@@ -70,18 +81,20 @@ class TestSiemApiSecurityHardening(unittest.TestCase):
             i.alerts.clear()
             db.session.delete(i)
 
-        # Delete test audit logs
-        AuditLog.query.filter(
-            AuditLog.action.like(f"%{_TEST_PREFIX}%")
-            | AuditLog.action.like("siem_webhook_ingest%")
-            | AuditLog.action.like("edr_alert_ingest%")
-        ).delete(synchronize_session=False)
+        # 3. Scope user and user-audit-log deletion strictly to test-prefixed users
+        test_users = User.query.filter(User.username.like(f"{_TEST_PREFIX}%")).all()
+        test_user_ids = [u.id for u in test_users]
+        if test_user_ids:
+            AuditLog.query.filter(
+                (AuditLog.user_id.in_(test_user_ids))
+                | (AuditLog.target_id.in_(test_user_ids))
+            ).delete(synchronize_session=False)
 
-        # Delete test users
-        users = User.query.filter(User.username.like(f"{_TEST_PREFIX}%")).all()
-        for u in users:
-            AuditLog.query.filter_by(user_id=u.id).delete()
-            db.session.delete(u)
+            for u in test_users:
+                db.session.delete(u)
+
+        # 4. Scope any remaining test audit logs strictly by test prefix
+        AuditLog.query.filter(AuditLog.action.like(f"%{_TEST_PREFIX}%")).delete(synchronize_session=False)
 
         db.session.commit()
 
@@ -308,8 +321,11 @@ class TestSiemApiSecurityHardening(unittest.TestCase):
     # =========================================================================
 
     def test_webhook_hmac_signature_validation(self):
-        """Verifies HMAC-SHA256 signature verification on inbound webhooks."""
-        secret = self.app.config["SIEM_WEBHOOK_API_KEY"]
+        """Verifies HMAC-SHA256 signature verification on inbound webhooks using distinct secrets."""
+        api_key = self.app.config["SIEM_WEBHOOK_API_KEY"]
+        signing_secret = self.app.config["SIEM_WEBHOOK_SECRET"]
+        self.assertNotEqual(api_key, signing_secret)
+
         payload = {
             "title": f"{_TEST_PREFIX}HMAC Signed Alert",
             "source": "Splunk",
@@ -319,16 +335,16 @@ class TestSiemApiSecurityHardening(unittest.TestCase):
         raw_body = json.dumps(payload).encode("utf-8")
         ts = str(int(time.time()))
 
-        # Compute valid HMAC of f"{ts}.{raw_body}"
-        expected_sig = hmac.new(secret.encode("utf-8"), f"{ts}.".encode("utf-8") + raw_body, hashlib.sha256).hexdigest()
+        # Compute valid HMAC of f"{ts}.{raw_body}" with signing secret
+        expected_sig = hmac.new(signing_secret.encode("utf-8"), f"{ts}.".encode("utf-8") + raw_body, hashlib.sha256).hexdigest()
 
-        # 1. Valid signature succeeds
+        # 1. Valid signature and API key succeeds
         resp = self.client.post(
             "/api/v1/webhook/alert",
             data=raw_body,
             headers={
                 "Content-Type": "application/json",
-                "X-API-Key": secret,
+                "X-API-Key": api_key,
                 "X-Webhook-Signature": f"sha256={expected_sig}",
                 "X-Webhook-Timestamp": ts,
             }
@@ -341,7 +357,7 @@ class TestSiemApiSecurityHardening(unittest.TestCase):
             data=raw_body,
             headers={
                 "Content-Type": "application/json",
-                "X-API-Key": secret,
+                "X-API-Key": api_key,
                 "X-Webhook-Signature": "sha256=badf00ddeadbeef1234567890abcdef1234567890abcdef1234567890abcdef",
                 "X-Webhook-Timestamp": ts,
             }
@@ -349,9 +365,39 @@ class TestSiemApiSecurityHardening(unittest.TestCase):
         self.assertEqual(resp_tampered.status_code, 401)
         self.assertEqual(resp_tampered.get_json()["error"], "InvalidSignature")
 
+        # 3. Signature generated with API key instead of signing secret fails (401)
+        wrong_sig = hmac.new(api_key.encode("utf-8"), f"{ts}.".encode("utf-8") + raw_body, hashlib.sha256).hexdigest()
+        resp_wrong_sig = self.client.post(
+            "/api/v1/webhook/alert",
+            data=raw_body,
+            headers={
+                "Content-Type": "application/json",
+                "X-API-Key": api_key,
+                "X-Webhook-Signature": f"sha256={wrong_sig}",
+                "X-Webhook-Timestamp": ts,
+            }
+        )
+        self.assertEqual(resp_wrong_sig.status_code, 401)
+        self.assertEqual(resp_wrong_sig.get_json()["error"], "InvalidSignature")
+
+        # 4. Using signing secret in X-API-Key header fails (401 Unauthorized)
+        resp_wrong_auth = self.client.post(
+            "/api/v1/webhook/alert",
+            data=raw_body,
+            headers={
+                "Content-Type": "application/json",
+                "X-API-Key": signing_secret,
+                "X-Webhook-Signature": f"sha256={expected_sig}",
+                "X-Webhook-Timestamp": ts,
+            }
+        )
+        self.assertEqual(resp_wrong_auth.status_code, 401)
+        self.assertEqual(resp_wrong_auth.get_json()["error"], "Unauthorized")
+
     def test_webhook_replay_protection_rejects_expired_timestamp(self):
         """Verifies timestamps older than 300 seconds are rejected to mitigate replays."""
-        secret = self.app.config["SIEM_WEBHOOK_API_KEY"]
+        api_key = self.app.config["SIEM_WEBHOOK_API_KEY"]
+        signing_secret = self.app.config["SIEM_WEBHOOK_SECRET"]
         payload = {
             "title": f"{_TEST_PREFIX}Replay Alert",
             "source": "Sentinel",
@@ -360,14 +406,14 @@ class TestSiemApiSecurityHardening(unittest.TestCase):
         raw_body = json.dumps(payload).encode("utf-8")
         old_ts = str(int(time.time()) - 360)  # 6 minutes ago (outside 300s window)
 
-        expected_sig = hmac.new(secret.encode("utf-8"), f"{old_ts}.".encode("utf-8") + raw_body, hashlib.sha256).hexdigest()
+        expected_sig = hmac.new(signing_secret.encode("utf-8"), f"{old_ts}.".encode("utf-8") + raw_body, hashlib.sha256).hexdigest()
 
         resp = self.client.post(
             "/api/v1/webhook/alert",
             data=raw_body,
             headers={
                 "Content-Type": "application/json",
-                "X-API-Key": secret,
+                "X-API-Key": api_key,
                 "X-Webhook-Signature": f"sha256={expected_sig}",
                 "X-Webhook-Timestamp": old_ts,
             }
@@ -516,11 +562,11 @@ class TestSiemApiSecurityHardening(unittest.TestCase):
                 os.environ.pop("SIEM_WEBHOOK_API_KEY", None)
 
     # =========================================================================
-    # 8. QUERY STRING API KEY REJECTION REGRESSION TESTS (CWE-598)
+    # 8. QUERY STRING API KEY REJECTION & STRICT PROHIBITION (CWE-598)
     # =========================================================================
 
     def test_valid_header_api_key_authenticates(self):
-        """Verifies valid X-API-Key header authenticates an authorized request (200)."""
+        """Verifies valid X-API-Key header alone authenticates an authorized request (200)."""
         resp = self.client.get(
             "/api/v2/indicators",
             headers={"X-API-Key": self.analyst.api_key}
@@ -540,53 +586,162 @@ class TestSiemApiSecurityHardening(unittest.TestCase):
         self.assertFalse(data.get("success", True))
         self.assertEqual(data.get("error"), "Unauthorized")
 
-    def test_query_string_api_key_alone_rejected_even_if_valid(self):
-        """Verifies query-string ?api_key= alone is rejected with 401 even if key is valid."""
-        secret_sample = self.analyst.api_key
-        resp = self.client.get(f"/api/v2/indicators?api_key={secret_sample}")
-        self.assertEqual(resp.status_code, 401)
-        data = resp.get_json()
-        self.assertFalse(data.get("success", True))
-        self.assertEqual(data.get("error"), "Unauthorized")
-        # Ensure error message states rejection policy
-        self.assertIn("rejected", data.get("message", "").lower())
-        # Ensure secret itself is NOT leaked in the response body
-        self.assertNotIn(secret_sample, resp.get_data(as_text=True))
-
-    def test_header_precedence_and_no_fallback_to_query_string(self):
+    def test_query_string_api_key_prohibited_under_all_conditions(self):
         """
-        Verifies policy when both header and query-string are provided:
-        - Valid header authenticates without relying on query-string.
-        - Invalid header fails (401) and does NOT silently fall back to valid query-string.
+        Verifies policy when query-string ?api_key= is used:
+        Any api_key in URL query parameters is strictly prohibited and returns 401:
+        1. Valid header + valid query key -> 401
+        2. Valid header + invalid query key -> 401
+        3. Invalid header + valid query key -> 401
+        4. Query-only authentication (valid or invalid) -> 401
         """
-        # Case A: Valid header + invalid query string -> Authenticates via valid header (200)
-        resp_a = self.client.get(
-            "/api/v2/indicators?api_key=invalid_query_key_123",
-            headers={"X-API-Key": self.analyst.api_key}
-        )
-        self.assertEqual(resp_a.status_code, 200)
+        valid_header = self.analyst.api_key
+        valid_query = self.admin.api_key
+        invalid_key = "invalid_credential_key_777"
 
-        # Case B: Invalid header + valid query string -> Fails (401), does NOT fall back to query string!
-        resp_b = self.client.get(
-            f"/api/v2/indicators?api_key={self.analyst.api_key}",
-            headers={"X-API-Key": "invalid_header_key_456"}
+        # 1. Valid header + valid query key -> Rejected (401)
+        resp1 = self.client.get(
+            f"/api/v2/indicators?api_key={valid_query}",
+            headers={"X-API-Key": valid_header}
         )
-        self.assertEqual(resp_b.status_code, 401)
-        self.assertFalse(resp_b.get_json().get("success", True))
+        self.assertEqual(resp1.status_code, 401)
+        self.assertIn("prohibited", resp1.get_json()["message"].lower())
+
+        # 2. Valid header + invalid query key -> Rejected (401)
+        resp2 = self.client.get(
+            f"/api/v2/indicators?api_key={invalid_key}",
+            headers={"X-API-Key": valid_header}
+        )
+        self.assertEqual(resp2.status_code, 401)
+        self.assertIn("prohibited", resp2.get_json()["message"].lower())
+
+        # 3. Invalid header + valid query key -> Rejected (401)
+        resp3 = self.client.get(
+            f"/api/v2/indicators?api_key={valid_query}",
+            headers={"X-API-Key": invalid_key}
+        )
+        self.assertEqual(resp3.status_code, 401)
+        self.assertIn("prohibited", resp3.get_json()["message"].lower())
+
+        # 4. Query-only authentication (no header, valid key in query) -> Rejected (401)
+        resp4 = self.client.get(f"/api/v2/indicators?api_key={valid_query}")
+        self.assertEqual(resp4.status_code, 401)
+        self.assertIn("prohibited", resp4.get_json()["message"].lower())
+
+        # 5. Query-only authentication (no header, invalid key in query) -> Rejected (401)
+        resp5 = self.client.get(f"/api/v2/indicators?api_key={invalid_key}")
+        self.assertEqual(resp5.status_code, 401)
+        self.assertIn("prohibited", resp5.get_json()["message"].lower())
 
     def test_secrets_redacted_from_error_responses_and_logs(self):
-        """Verifies that secrets passed in query string or headers are never exposed in error text or logs."""
-        canary_secret = "CANARY_SECRET_DO_NOT_LEAK_789xyz"
-        with self.assertLogs("app.services.siem_edr_service", level="WARNING") as log_capture:
-            resp = self.client.get(f"/api/v2/indicators?api_key={canary_secret}")
-            self.assertEqual(resp.status_code, 401)
-            response_text = resp.get_data(as_text=True)
-            self.assertNotIn(canary_secret, response_text)
+        """
+        Verifies that API-key canary values are absent from response bodies,
+        error messages, and captured logs for both header-based and query-string requests.
+        """
+        canary_query = "CANARY_QUERY_KEY_LEAK_CHECK_999xyz"
+        canary_header = "CANARY_HEADER_KEY_LEAK_CHECK_888abc"
 
-        # Verify log output does not include the raw secret
-        for log_entry in log_capture.output:
-            self.assertNotIn(canary_secret, log_entry)
+        # Case 1: Query-string request with canary secret
+        with self.assertLogs("app.services.siem_edr_service", level="WARNING") as log_capture_query:
+            resp_query = self.client.get(f"/api/v2/indicators?api_key={canary_query}")
+            self.assertEqual(resp_query.status_code, 401)
+            response_query_text = resp_query.get_data(as_text=True)
+            self.assertNotIn(canary_query, response_query_text)
+            error_query_msg = resp_query.get_json().get("message", "")
+            self.assertNotIn(canary_query, error_query_msg)
+
+        # Verify log output does not include the raw query secret
+        for log_entry in log_capture_query.output:
+            self.assertNotIn(canary_query, log_entry)
             self.assertIn("query parameter", log_entry.lower())
+
+        # Case 2: Header-based request with canary secret
+        resp_header = self.client.get(
+            "/api/v2/indicators",
+            headers={"X-API-Key": canary_header}
+        )
+        self.assertEqual(resp_header.status_code, 401)
+        response_header_text = resp_header.get_data(as_text=True)
+        self.assertNotIn(canary_header, response_header_text)
+        error_header_msg = resp_header.get_json().get("message", "")
+        self.assertNotIn(canary_header, error_header_msg)
+
+    # =========================================================================
+    # 9. WEBHOOK SECRET SEPARATION & HMAC VERIFICATION
+    # =========================================================================
+
+    def test_webhook_secret_separation_and_hmac_verification(self):
+        """
+        Verifies that SIEM_WEBHOOK_API_KEY and SIEM_WEBHOOK_SECRET are distinct,
+        and that HMAC verification strictly uses the intended SIEM_WEBHOOK_SECRET.
+        """
+        api_key = self.app.config["SIEM_WEBHOOK_API_KEY"]
+        signing_secret = self.app.config["SIEM_WEBHOOK_SECRET"]
+
+        # Ensure the two values are distinct
+        self.assertNotEqual(api_key, signing_secret)
+
+        payload = {
+            "title": f"{_TEST_PREFIX}Secret Separation Alert",
+            "source": "Splunk",
+            "severity": "High",
+            "description": "Verifying distinct signing secret vs API key",
+        }
+        raw_body = json.dumps(payload).encode("utf-8")
+        ts = str(int(time.time()))
+
+        # 1. Signature computed with the correct signing secret (SIEM_WEBHOOK_SECRET) -> SUCCEEDS (201)
+        valid_sig = hmac.new(
+            signing_secret.encode("utf-8"),
+            f"{ts}.".encode("utf-8") + raw_body,
+            hashlib.sha256
+        ).hexdigest()
+
+        resp_valid = self.client.post(
+            "/api/v1/webhook/alert",
+            data=raw_body,
+            headers={
+                "Content-Type": "application/json",
+                "X-API-Key": api_key,
+                "X-Webhook-Signature": f"sha256={valid_sig}",
+                "X-Webhook-Timestamp": ts,
+            }
+        )
+        self.assertEqual(resp_valid.status_code, 201)
+
+        # 2. Signature computed with API key instead of signing secret -> FAILS (401 InvalidSignature)
+        wrong_sig = hmac.new(
+            api_key.encode("utf-8"),
+            f"{ts}.".encode("utf-8") + raw_body,
+            hashlib.sha256
+        ).hexdigest()
+
+        resp_wrong_sig = self.client.post(
+            "/api/v1/webhook/alert",
+            data=raw_body,
+            headers={
+                "Content-Type": "application/json",
+                "X-API-Key": api_key,
+                "X-Webhook-Signature": f"sha256={wrong_sig}",
+                "X-Webhook-Timestamp": ts,
+            }
+        )
+        self.assertEqual(resp_wrong_sig.status_code, 401)
+        self.assertEqual(resp_wrong_sig.get_json()["error"], "InvalidSignature")
+
+        # 3. Supplying the signing secret as the API key in X-API-Key header -> FAILS (401 Unauthorized)
+        resp_wrong_key = self.client.post(
+            "/api/v1/webhook/alert",
+            data=raw_body,
+            headers={
+                "Content-Type": "application/json",
+                "X-API-Key": signing_secret,
+                "X-Webhook-Signature": f"sha256={valid_sig}",
+                "X-Webhook-Timestamp": ts,
+            }
+        )
+        self.assertEqual(resp_wrong_key.status_code, 401)
+        self.assertEqual(resp_wrong_key.get_json()["error"], "Unauthorized")
 
 
 if __name__ == "__main__":

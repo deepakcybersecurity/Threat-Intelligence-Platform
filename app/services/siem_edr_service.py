@@ -124,18 +124,19 @@ def authenticate_api_request(req: Any) -> Tuple[bool, str, Optional[Dict[str, An
         elif len(parts) == 1:
             api_key = parts[0].strip()
 
-    # 3. Query parameter ?api_key= is explicitly rejected (Security Hardening: CWE-598)
+    # 3. Query parameter ?api_key= is strictly prohibited (Security Hardening: CWE-598)
+    # Reject request unconditionally if any api_key query parameter is present,
+    # even when an API key is also supplied in headers, to strictly prevent credential leakage.
     if "api_key" in req.args:
         logger.warning(
-            "Rejected API key transmission in URL query parameter (?api_key=). "
-            "Clients must supply credentials via X-API-Key or Authorization headers."
+            "Rejected API request containing credentials in URL query parameter (?api_key=). "
+            "Clients must supply credentials exclusively via X-API-Key or Authorization headers."
         )
-        if not api_key:
-            return (
-                False,
-                "API keys in URL query parameters are rejected for security. Use X-API-Key or Authorization: Bearer header.",
-                None,
-            )
+        return (
+            False,
+            "API keys in URL query parameters are strictly prohibited. Use X-API-Key or Authorization: Bearer header.",
+            None,
+        )
 
     if not api_key:
         return False, "Missing API key in request headers (X-API-Key or Authorization: Bearer)", None

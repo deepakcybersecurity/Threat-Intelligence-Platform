@@ -13,15 +13,19 @@
 An independent, fresh verification and targeted remediation was conducted on the Flask-based **Threat Intelligence Platform (TIP)** to audit security control hardening, eliminate credential leakage in URL query parameters (`CWE-598`), and validate all platform test suites.
 
 ### Key Audit & Remediation Findings:
-1. **Targeted Security Fix (Query-String API Key Rejection):**
-   - The query parameter fallback in `app/services/siem_edr_service.py` was eliminated. Inbound requests transmitting API credentials via `?api_key=` are now strictly rejected with `HTTP 401 Unauthorized` (`"API keys in URL query parameters are rejected for security. Use X-API-Key or Authorization: Bearer header."`).
-   - Header precedence is strictly maintained. Supplying an invalid header with a valid query string fails with `401` and does not silently fall back.
-   - Raw credentials from query parameters or headers are completely redacted from all error messages and server logs.
-2. **Fresh Test Discovery & Execution:** Fresh execution of the full test runner confirmed **23 test modules** and **385 test cases** (including 5 new targeted regression tests). All 385 tests passed with **0 failures, 0 errors, and 0 skipped tests** in **205.90s** (~3.4 minutes).
-3. **Database Safety Gate:** Safety protocols held. The production administrator account (`deepak`, ID: 2957) and existing operational records were fully isolated. All synthetic test records (`e2e_test_`, `sec_test_`) were completely purged during `tearDown()`.
-4. **Security Controls Verification:**
-   - **All 6 of 6** previously audited security concerns are now **`Verified fixed`** (username/email API key bypass, secret exposure on SIEM portal, static production secrets, IOC lifecycle RBAC, API v2 write RBAC, and query-string credential rejection).
-5. **Test Architecture Distinction:** Automated tests are executed via Flask's WSGI `test_client()` against a local MySQL database. No headless browser framework (Playwright/Selenium) is configured in the automated test runner, and third-party threat feeds and SIEM engines are simulated via mocks.
+1. **Targeted Security Fix & Policy Clarification (Query-String API Key Rejection):**
+   - In `app/services/siem_edr_service.py`, inbound requests containing `?api_key=` are now strictly and unconditionally rejected (`HTTP 401 Unauthorized`) with `"API keys in URL query parameters are strictly prohibited. Use X-API-Key or Authorization: Bearer header."`.
+   - Policy is enforced under all combinations: supplying a valid header alongside any query-string key fails with 401 (no credential fallback or bypass).
+   - Raw credentials are strictly redacted; canary tokens are absent from responses and logs.
+2. **Webhook Secret Separation & HMAC Verification:**
+   - Webhook authentication strictly decouples caller identity (`SIEM_WEBHOOK_API_KEY`) from HMAC cryptographic signing (`SIEM_WEBHOOK_SECRET`). Test configuration uses distinct secret values. Tamper-proofing and key-confusion tests confirm that signing with the API key or authenticating with the HMAC secret is rejected.
+3. **Safe, Scoped Test Cleanup:**
+   - Test teardown and cleanup logic in `tests/test_siem_api_security_hardening.py` was refactored to eliminate broad table deletions (such as removing all `SIEM/EDR` alerts or broad `siem_webhook_ingest%` audit logs). Cleanup is strictly scoped to test-prefixed alert and user IDs.
+4. **Fresh Test Discovery & Execution:** Fresh execution of the full test runner confirmed **23 test modules** and **385 test cases** (including 5 new targeted regression tests). All 385 tests passed with **0 failures, 0 errors, and 0 skipped tests**.
+5. **Database Safety Gate:** Safety protocols held. The production administrator account (`deepak`, ID: 2957) and existing operational records were fully isolated. All synthetic test records (`e2e_test_`, `sec_test_`) were completely purged during `tearDown()`.
+6. **Security Controls Verification:**
+   - **All 6 of 6** previously audited security concerns are now **`Verified fixed`** (username/email API key bypass, secret exposure on SIEM portal, static production secrets, IOC lifecycle RBAC, API v2 write RBAC, and unconditional query-string credential rejection).
+7. **Test Architecture Distinction:** Automated tests are executed via Flask's WSGI `test_client()` against a local MySQL database. No headless browser framework (Playwright/Selenium) is configured in the automated test runner, and third-party threat feeds and SIEM engines are simulated via mocks.
 
 ---
 
@@ -62,7 +66,7 @@ An independent, fresh verification and targeted remediation was conducted on the
    ```powershell
    python -m unittest discover -s tests
    ```
-   - **Result:** Ran 385 tests in 209.217s. **Status: OK (385 passed, 0 failed, 0 errors, 0 skipped).**
+   - **Result:** Ran 385 tests in 210.896s. **Status: OK (385 passed, 0 failed, 0 errors, 0 skipped).**
 
 ---
 
@@ -108,32 +112,62 @@ An independent, fresh verification and targeted remediation was conducted on the
 | **3. Static Default Webhook Secret Fallback** | `config.py` (`ProductionConfig.validate_production_secrets`) | Raises `ValueError` if `SECRET_KEY` or `SIEM_WEBHOOK_API_KEY` are unset or set to development fallback values. | **`Verified fixed`** |
 | **4. IOC Expiry/Reactivate Missing Authorization** | `app/api/routes.py` (`/api/v1/ioc/expire`, `/reactivate/<id>`) | Calling with `role="user"` returns `HTTP 403 Forbidden`. Only `admin` and `analyst` keys can expire or reactivate indicators. | **`Verified fixed`** |
 | **5. API v2 Write Operations Missing Role Checks** | `app/api/routes.py` (`POST/PUT/DELETE /api/v2/indicators`) | Read-only users (`role="user"`) receive `HTTP 403 Forbidden` on all indicator and alert modifications. | **`Verified fixed`** |
-| **6. API Keys Accepted in URL Query Strings** | `app/services/siem_edr_service.py` (lines 126–136) | Passing `?api_key=<key>` alone is strictly rejected with `HTTP 401`. Invalid header + valid query key fails with 401 (no fallback). Secrets are redacted from logs and errors. | **`Verified fixed`** |
+| **6. API Keys Accepted in URL Query Strings** | `app/services/siem_edr_service.py` (lines 127–140) | Inbound query parameter `?api_key=` is strictly and unconditionally rejected with `HTTP 401`. Valid header + query key, invalid header + query key, and query-only are all rejected. Raw secrets are redacted from logs and errors. | **`Verified fixed`** |
 
 ---
 
-### 4.2 Webhook Cryptographic Integrity & Anti-Replay
+### 4.2 Webhook Cryptographic Integrity, Secret Separation & Anti-Replay
 
-- **HMAC-SHA256 Verification:** Inbound requests to `POST /api/v1/webhook/alert` require `X-Webhook-Signature: sha256=<hash>`. The hash is calculated over `timestamp + "." + raw_body` using `SIEM_WEBHOOK_SECRET` and evaluated using constant-time `secrets.compare_digest`.
+- **HMAC-SHA256 Verification & Secret Separation:** Inbound requests to `POST /api/v1/webhook/alert` authenticate via `X-API-Key` matching `SIEM_WEBHOOK_API_KEY` and require payload verification via `X-Webhook-Signature: sha256=<hash>` signed with `SIEM_WEBHOOK_SECRET`. The two secrets are distinct. Empirical regression tests verify that computing the signature with the API key returns `401 InvalidSignature`, and using the HMAC signing secret in the `X-API-Key` header returns `401 Unauthorized`.
 - **Replay Window:** Enforces `abs(server_time - timestamp) <= 300` seconds. Stale timestamps return `401 Unauthorized: Webhook timestamp expired or outside freshness window`.
-- **Payload Redaction:** Malformed payloads or database errors return generic sanitized JSON without exposing internal database schemas or stack traces.
+- **Payload & Secret Redaction:** Malformed payloads or error responses return generic sanitized JSON. Canary secrets (`CANARY_QUERY_KEY_LEAK_CHECK_999xyz`, `CANARY_HEADER_KEY_LEAK_CHECK_888abc`) are confirmed absent from response payloads, error strings, and application logs.
 
 ---
 
 ## 5. Security & QA Findings
 
-### 🛡️ Remediated Finding: API Key Accepted in URL Query Parameters (CWE-598)
+### 🛡️ Remediated Finding 1: API Key Accepted in URL Query Parameters (CWE-598)
 - **Status:** **`Remediated & Verified Fixed`**
 - **Changes Applied:**
-  - `app/services/siem_edr_service.py`: Replaced query parameter credential fallback with strict rejection:
+  - `app/services/siem_edr_service.py`: Query parameter presence triggers immediate rejection:
     ```python
     if "api_key" in req.args:
-        logger.warning("Rejected API key transmission in URL query parameter (?api_key=).")
-        if not api_key:
-            return False, "API keys in URL query parameters are rejected for security. Use X-API-Key or Authorization: Bearer header.", None
+        logger.warning(
+            "Rejected API request containing credentials in URL query parameter (?api_key=). "
+            "Clients must supply credentials exclusively via X-API-Key or Authorization headers."
+        )
+        return (
+            False,
+            "API keys in URL query parameters are strictly prohibited. Use X-API-Key or Authorization: Bearer header.",
+            None,
+        )
     ```
-  - `tests/test_rest_api.py`: Updated `test_query_param_api_key_rejected` to assert HTTP 401 response.
-  - `tests/test_siem_api_security_hardening.py`: Added 5 regression tests covering valid header authentication, invalid header rejection, query string rejection, header precedence without silent fallback, and secret redaction.
+  - `tests/test_rest_api.py`: Updated `test_query_param_api_key_rejected` to assert HTTP 401 response and `"prohibited"` message.
+  - `tests/test_siem_api_security_hardening.py`: Added comprehensive matrix tests (`test_query_string_api_key_prohibited_under_all_conditions`):
+    1. Valid header + valid query key -> 401
+    2. Valid header + invalid query key -> 401
+    3. Invalid header + valid query key -> 401
+    4. Query-only valid -> 401
+    5. Query-only invalid -> 401
+
+### 🛡️ Remediated Finding 2: Destructive Test Cleanup Scope in Test Suites
+- **Status:** **`Remediated & Verified Fixed`**
+- **Changes Applied:**
+  - `tests/test_siem_api_security_hardening.py`: Replaced broad table deletion (`Alert.alert_type == "SIEM/EDR"` and `AuditLog.action.like("siem_webhook_ingest%")`) with strictly scoped queries:
+    ```python
+    test_alerts = Alert.query.filter(
+        (Alert.title.like(f"%{_TEST_PREFIX}%"))
+        | (Alert.description.like(f"%{_TEST_PREFIX}%"))
+    ).all()
+    test_alert_ids = [a.id for a in test_alerts]
+    if test_alert_ids:
+        AuditLog.query.filter(
+            AuditLog.target_table == "alerts",
+            AuditLog.target_id.in_(test_alert_ids)
+        ).delete(synchronize_session=False)
+        Alert.query.filter(Alert.id.in_(test_alert_ids)).delete(synchronize_session=False)
+    ```
+  - Ensures production records and operational SIEM/EDR alerts/logs are never modified or purged.
 
 ### ℹ️ Informational Finding: Deprecated `datetime.utcnow()` Usage Across Core Services
 - **Severity:** Informational / Technical Debt

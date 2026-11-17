@@ -262,7 +262,7 @@ class TestRestApiV2(unittest.TestCase):
         self.assertEqual(resp.status_code, 401)
         data = resp.get_json()
         self.assertFalse(data.get("success", True))
-        self.assertIn("rejected", data.get("message", "").lower())
+        self.assertIn("prohibited", data.get("message", "").lower())
 
     # =========================================================================
     # 2. OPENAPI DOCUMENTATION ENDPOINT
