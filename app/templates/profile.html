@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="User Profile. Configure personal settings, reset access passwords, inspect role privileges, and audit active platform sessions.">
+    <title>User Profile - Threat Intelligence Platform</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="{{ url_for('static', filename='js/1-funtioning.js') }}" defer></script>
+</head>
+<body class="dashboard-page">
+
+    <!-- Top Navigation Header -->
+    <header class="main-header">
+        <nav class="navbar dashboard-navbar" aria-label="Main Navigation">
+            <div class="navbar-brand">
+                <a href="{{ url_for('main.home') }}" class="logo-link">
+                    <span class="logo-icon">&#128737;</span>
+                    <span class="logo-text">ThreatIntel Platform</span>
+                </a>
+            </div>
+
+            <!-- Global Quick Search -->
+            <div class="navbar-search">
+                <form action="{{ url_for('dashboard.search_threats') }}" method="GET" class="search-form">
+                    <label for="global-search" class="visually-hidden">Search threats, IPs, hashes</label>
+                    <input type="search" id="global-search" name="query" class="search-input" placeholder="Search threats, IPs, CVEs...">
+                    <button type="submit" class="search-button">Search</button>
+                </form>
+            </div>
+
+            <div class="navbar-user-menu">
+                <span class="user-role badge-critical">{{ current_user.role | upper }}</span>
+                <a href="{{ url_for('dashboard.profile') }}" class="user-profile-link">{{ current_user.username }}</a>
+                <a href="{{ url_for('auth.logout') }}" class="logout-link">Sign Out</a>
+            </div>
+        </nav>
+    </header>
+
+    <div class="layout-container">
+        
+        <!-- Left Sidebar Navigation -->
+        <aside class="sidebar" aria-label="Sidebar Navigation">
+            <nav class="sidebar-navigation">
+                <ul class="sidebar-menu">
+                    <li><a href="{{ url_for('dashboard.dashboard') }}" class="menu-item">Dashboard Overview</a></li>
+                    <li><a href="{{ url_for('dashboard.threat_feed') }}" class="menu-item">Live Threat Feed</a></li>
+                    <li><a href="{{ url_for('dashboard.ip_checker') }}" class="menu-item">IP Address Checker</a></li>
+                    <li><a href="{{ url_for('dashboard.malware_info') }}" class="menu-item">Malware Information</a></li>
+                    <li><a href="{{ url_for('dashboard.threat_report_upload') }}" class="menu-item">Upload Threat Report</a></li>
+                    <li><a href="{{ url_for('dashboard.search_threats') }}" class="menu-item">Search Threats Database</a></li>
+                    <li><a href="{{ url_for('dashboard.alerts') }}" class="menu-item">Alerts &amp; Notifications</a></li>
+                    {% if current_user.role == 'admin' %}
+                    <li><a href="{{ url_for('admin.admin') }}" class="menu-item">System Admin Panel</a></li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="dashboard-main-content">
+
+            <!-- Flash Messages -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+            <div class="flash-messages" role="alert" style="margin-bottom: 20px;">
+                {% for category, message in messages %}
+                <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            </div>
+            {% endif %}
+            {% endwith %}
+            
+            <section class="profile-section" aria-labelledby="profile-heading">
+                <header class="section-header">
+                    <h1 id="profile-heading" class="page-title">User Profile &amp; Security Settings</h1>
+                    <p class="page-subtitle">Inspect account attributes, update access password, and review authenticated session telemetry</p>
+                </header>
+
+                <div class="profile-grid-layout">
+                    
+                    <!-- Profile Information Card (Real current_user data - G-9) -->
+                    <article class="profile-card">
+                        <header class="card-header">
+                            <h2 class="card-title">Account Credentials &amp; Role Identity</h2>
+                        </header>
+                        <form action="{{ url_for('dashboard.profile') }}" method="POST" class="profile-form">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="action" value="update_contact">
+                            
+                            <div class="form-row">
+                                <div class="form-group half-width">
+                                    <label for="profile-username" class="form-label">Username</label>
+                                    <input type="text" id="profile-username" name="username" class="form-input form-input-readonly" 
+                                           value="{{ current_user.username }}" readonly>
+                                </div>
+                                <div class="form-group half-width">
+                                    <label for="profile-role" class="form-label">Platform Security Role</label>
+                                    <input type="text" id="profile-role" name="role" class="form-input form-input-readonly" 
+                                           value="{{ current_user.role | capitalize }}" readonly>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="profile-email" class="form-label">Email Address</label>
+                                <input type="email" id="profile-email" name="email" class="form-input form-input-readonly" 
+                                       value="{{ current_user.email }}" readonly>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group half-width">
+                                    <label for="profile-status" class="form-label">Account Status</label>
+                                    <input type="text" id="profile-status" name="status" class="form-input form-input-readonly" 
+                                           value="{% if current_user.is_active %}Active Account{% else %}Suspended{% endif %}" readonly>
+                                </div>
+                                <div class="form-group half-width">
+                                    <label for="profile-created" class="form-label">Registered Date</label>
+                                    <input type="text" id="profile-created" name="created_at" class="form-input form-input-readonly" 
+                                           value="{{ current_user.created_at.strftime('%Y-%m-%d %H:%M UTC') if current_user.created_at else 'Active' }}" readonly>
+                                </div>
+                            </div>
+                            <small class="form-help-text" style="color: #888; font-size: 0.82em; display: block; margin-top: 6px;">
+                                Role assignments, status, and directory credentials are administrative records and cannot be modified self-service.
+                            </small>
+                        </form>
+                    </article>
+
+                    <!-- Reset Password Form (Functional G-2) -->
+                    <article class="profile-card">
+                        <header class="card-header">
+                            <h2 class="card-title">Change Cryptographic Access Password</h2>
+                        </header>
+                        <form action="{{ url_for('dashboard.profile') }}" method="POST" class="profile-form">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="action" value="change_password">
+                            
+                            <div class="form-group">
+                                <label for="current-password" class="form-label">Current Password</label>
+                                <input type="password" id="current-password" name="current_password" class="form-input" 
+                                       placeholder="Enter your current password" required autocomplete="current-password">
+                            </div>
+                            <div class="form-group">
+                                <label for="new-password" class="form-label">New Access Password</label>
+                                <input type="password" id="new-password" name="new_password" class="form-input" 
+                                       placeholder="Min. 8 characters" required minlength="8" autocomplete="new-password">
+                                <small class="form-help-text" style="color: #888; font-size: 0.82em; display: block; margin-top: 4px;">
+                                    Must meet complexity rules: at least 8 characters, uppercase, lowercase, digit, and special symbol.
+                                </small>
+                            </div>
+                            <div class="form-group">
+                                <label for="confirm-password" class="form-label">Confirm New Password</label>
+                                <input type="password" id="confirm-password" name="confirm_password" class="form-input" 
+                                       placeholder="Repeat new password" required minlength="8" autocomplete="new-password">
+                            </div>
+                            <div class="form-actions">
+                                <button type="submit" class="btn btn-primary btn-submit">Update Access Password</button>
+                            </div>
+                        </form>
+                    </article>
+
+                </div>
+
+                <hr class="section-divider">
+
+                <div class="profile-grid-layout">
+                    
+                    <!-- Multi-Factor Auth Card (Functional TOTP - Phase 3) -->
+                    <article class="profile-card">
+                        <header class="card-header">
+                            <h2 class="card-title">Multi-Factor Authentication (TOTP 2FA)</h2>
+                        </header>
+                        <div class="card-body">
+                            {% if mfa_setup %}
+                            <!-- MFA Setup Wizard State -->
+                            <div class="status-box info-box" style="border-left: 4px solid #3b82f6; padding: 12px; background: rgba(59, 130, 246, 0.1); margin-bottom: 15px; border-radius: 4px;">
+                                <strong style="color: #60a5fa;">Step 1: Scan Authenticator QR Code</strong>
+                                <p style="margin: 5px 0 0; color: #bbb; font-size: 0.88em;">
+                                    Open Google Authenticator, Microsoft Authenticator, or 1Password and scan the QR code below.
+                                </p>
+                            </div>
+
+                            <div style="text-align: center; margin: 15px 0; background: #ffffff; padding: 16px; border-radius: 8px; display: inline-block;">
+                                <div style="width: 180px; height: 180px; margin: 0 auto;">
+                                    {{ mfa_setup.qr_svg | safe }}
+                                </div>
+                            </div>
+
+                            <div style="margin-bottom: 15px;">
+                                <small style="color: #94a3b8; display: block; margin-bottom: 4px;">Can't scan? Enter this Base32 secret manually:</small>
+                                <code style="background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(148, 163, 184, 0.2); padding: 6px 10px; border-radius: 4px; color: #38bdf8; font-family: monospace; font-size: 0.95em; letter-spacing: 1px; word-break: break-all; display: block;">{{ mfa_setup.secret }}</code>
+                            </div>
+
+                            <div class="status-box warning-box" style="border-left: 4px solid #f59e0b; padding: 12px; background: rgba(245, 158, 11, 0.1); margin-bottom: 15px; border-radius: 4px;">
+                                <strong style="color: #f59e0b;">Step 2: Save Emergency Recovery Codes (Single-Use)</strong>
+                                <p style="margin: 5px 0 8px; color: #bbb; font-size: 0.85em;">
+                                    If you lose access to your authenticator, each code can be used once to sign in. Save them now in a password manager.
+                                </p>
+                                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px;">
+                                    {% for code in mfa_setup.backup_codes %}
+                                    <code style="background: rgba(0,0,0,0.3); padding: 4px 8px; border-radius: 3px; color: #f59e0b; font-family: monospace; font-size: 0.88em; text-align: center;">{{ code }}</code>
+                                    {% endfor %}
+                                </div>
+                            </div>
+
+                            <form action="{{ url_for('dashboard.profile') }}" method="POST" class="profile-form">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <input type="hidden" name="action" value="enable_mfa">
+                                <div class="form-group">
+                                    <label for="totp_code" class="form-label">Step 3: Enter 6-Digit Verification Code</label>
+                                    <input type="text" id="totp_code" name="totp_code" class="form-input"
+                                           placeholder="123456" maxlength="6" pattern="[0-9]{6}" autocomplete="one-time-code" required style="font-size: 1.2em; letter-spacing: 4px; text-align: center;">
+                                </div>
+                                <div class="form-actions" style="display: flex; gap: 10px; margin-top: 10px;">
+                                    <button type="submit" class="btn btn-primary" style="flex: 1;">Confirm & Enable 2FA</button>
+                                </div>
+                            </form>
+                            <form action="{{ url_for('dashboard.profile') }}" method="POST" style="margin-top: 8px;">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <input type="hidden" name="action" value="cancel_mfa_setup">
+                                <button type="submit" class="btn btn-secondary" style="width: 100%;">Cancel Setup</button>
+                            </form>
+
+                            {% elif current_user.mfa_enabled %}
+                            <!-- MFA Active State -->
+                            <div class="status-box success-box" style="border-left: 4px solid #10b981; padding: 12px; background: rgba(16, 185, 129, 0.1); margin-bottom: 15px; border-radius: 4px;">
+                                <strong style="color: #34d399;">● 2FA Is Active & Enforced</strong>
+                                <p style="margin: 5px 0 0; color: #bbb; font-size: 0.88em;">
+                                    Your account requires a 6-digit TOTP token or single-use recovery code on every login.
+                                </p>
+                            </div>
+
+                            <p style="color: #cbd5e1; font-size: 0.9em; margin-bottom: 15px;">
+                                Unused Emergency Recovery Codes: <strong style="color: #38bdf8;">{{ remaining_backup_codes }} / 8 remaining</strong>
+                            </p>
+
+                            <form action="{{ url_for('dashboard.profile') }}" method="POST" class="profile-form" onsubmit="return confirm('Are you sure you want to disable Multi-Factor Authentication? Your account security will be degraded.');">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <input type="hidden" name="action" value="disable_mfa">
+                                <div class="form-group">
+                                    <label for="mfa-current-password" class="form-label">Current Password (Required to disable 2FA)</label>
+                                    <input type="password" id="mfa-current-password" name="current_password" class="form-input"
+                                           placeholder="Enter your current password" required autocomplete="current-password">
+                                </div>
+                                <div class="form-actions">
+                                    <button type="submit" class="btn btn-action btn-danger" style="width: 100%; padding: 10px;">
+                                        Disable Multi-Factor Authentication
+                                    </button>
+                                </div>
+                            </form>
+
+                            {% else %}
+                            <!-- MFA Disabled State -->
+                            <div class="status-box warning-box" style="border-left: 4px solid #f59e0b; padding: 12px; background: rgba(245, 158, 11, 0.1); margin-bottom: 15px; border-radius: 4px;">
+                                <strong style="color: #f59e0b;">Status: 2FA Disabled</strong>
+                                <p style="margin: 5px 0 0; color: #bbb; font-size: 0.88em;">
+                                    Add an extra layer of defense to protect your analyst profile from unauthorized credential compromises.
+                                </p>
+                            </div>
+
+                            <p style="color: #cbd5e1; font-size: 0.9em; margin-bottom: 15px;">
+                                Works with standard RFC 6238 TOTP authenticator apps (Google Authenticator, Microsoft Authenticator, Authy, 1Password, Bitwarden).
+                            </p>
+
+                            <form action="{{ url_for('dashboard.profile') }}" method="POST" class="profile-form">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <input type="hidden" name="action" value="setup_mfa">
+                                <div class="form-actions">
+                                    <button type="submit" class="btn btn-primary" style="width: 100%; padding: 10px;">
+                                        Set Up Authenticator App (TOTP)
+                                    </button>
+                                </div>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </article>
+
+                    <!-- API Client Key Generation Card (Functional Self-Service - Phase 3) -->
+                    <article class="profile-card">
+                        <header class="card-header">
+                            <h2 class="card-title">Analyst API Integration Keys</h2>
+                        </header>
+                        <div class="card-body">
+                            <p>Machine-to-machine integrations and programmatic queries using REST API v1/v2 endpoints.</p>
+
+                            {% if newly_generated_api_key %}
+                            <div class="status-box success-box" style="border-left: 4px solid #10b981; padding: 14px; background: rgba(16, 185, 129, 0.15); margin-bottom: 15px; border-radius: 4px;">
+                                <strong style="color: #34d399;">New Personal API Key Generated!</strong>
+                                <p style="margin: 5px 0 8px; color: #fff; font-size: 0.88em;">
+                                    <strong>Important:</strong> Copy your token now. For security purposes, this secret key will never be displayed in plaintext again.
+                                </p>
+                                <div style="display: flex; gap: 8px; align-items: center; margin-top: 8px;">
+                                    <input type="text" id="newlyGeneratedKeyInput" class="form-input" readonly value="{{ newly_generated_api_key }}" style="font-family: monospace; color: #38bdf8; font-weight: bold; background: rgba(0,0,0,0.4);">
+                                    <button type="button" class="btn btn-secondary" onclick="navigator.clipboard.writeText(document.getElementById('newlyGeneratedKeyInput').value); alert('API Key copied to clipboard!');" style="white-space: nowrap;">Copy Key</button>
+                                </div>
+                            </div>
+                            {% endif %}
+
+                            {% if api_key_info.has_key %}
+                            <div class="status-box info-box" style="border-left: 4px solid #3b82f6; padding: 12px; background: rgba(59, 130, 246, 0.1); margin-bottom: 15px; border-radius: 4px;">
+                                <strong style="color: #60a5fa;">Active API Key Provisioned</strong>
+                                <div style="margin-top: 8px; font-size: 0.88em; color: #cbd5e1;">
+                                    <div><strong>Label:</strong> {{ api_key_info.label }}</div>
+                                    <div><strong>Masked Token:</strong> <code style="color: #38bdf8; background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 3px;">{{ api_key_info.masked_key }}</code></div>
+                                    <div><strong>Created:</strong> {{ api_key_info.created_at }}</div>
+                                </div>
+                                <p style="margin: 8px 0 0; color: #94a3b8; font-size: 0.82em;">
+                                    Include header <code>X-API-Key: &lt;your_token&gt;</code> in REST API v1/v2 queries.
+                                </p>
+                            </div>
+
+                            <!-- Regenerate / Rotate Key Form -->
+                            <form action="{{ url_for('dashboard.profile') }}" method="POST" class="profile-form" style="margin-bottom: 12px;">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <input type="hidden" name="action" value="generate_api_key">
+                                <div class="form-group">
+                                    <label for="rotate-token-label" class="form-label">Key Description / Label</label>
+                                    <input type="text" id="rotate-token-label" name="api_key_label" class="form-input" 
+                                           value="{{ api_key_info.label }}" required maxlength="100">
+                                </div>
+                                <div class="form-actions">
+                                    <button type="submit" class="btn btn-action btn-warning" style="width: 100%;"
+                                            onclick="return confirm('Regenerating this API key will immediately invalidate your previous key. Continue?');">
+                                        Rotate / Regenerate API Key
+                                    </button>
+                                </div>
+                            </form>
+
+                            <!-- Revoke Key Form -->
+                            <form action="{{ url_for('dashboard.profile') }}" method="POST" class="profile-form">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <input type="hidden" name="action" value="revoke_api_key">
+                                <button type="submit" class="btn btn-action btn-danger" style="width: 100%;"
+                                        onclick="return confirm('Revoking your API key will immediately disable programmatic access for any scripts using it. Continue?');">
+                                    Revoke Personal API Key
+                                </button>
+                            </form>
+
+                            {% else %}
+                            <div class="status-box warning-box" style="border-left: 4px solid #f59e0b; padding: 12px; background: rgba(245, 158, 11, 0.1); margin-bottom: 15px; border-radius: 4px;">
+                                <strong style="color: #f59e0b;">No Personal API Key Provisioned</strong>
+                                <p style="margin: 5px 0 0; color: #bbb; font-size: 0.88em;">
+                                    Generate an analyst API token to perform authenticated queries against <code>/api/v1</code> and <code>/api/v2</code> endpoints.
+                                </p>
+                            </div>
+
+                            <form action="{{ url_for('dashboard.profile') }}" method="POST" class="profile-form">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <input type="hidden" name="action" value="generate_api_key">
+                                <div class="form-group">
+                                    <label for="new-token-label" class="form-label">Key Description / Purpose</label>
+                                    <input type="text" id="new-token-label" name="api_key_label" class="form-input" 
+                                           placeholder="e.g. SIEM-Collector-Automation" required maxlength="100">
+                                </div>
+                                <div class="form-actions">
+                                    <button type="submit" class="btn btn-primary" style="width: 100%;">
+                                        Generate Personal API Key
+                                    </button>
+                                </div>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </article>
+
+                </div>
+
+                <hr class="section-divider">
+
+                <!-- Sessions Log Section (Real Telemetry - G-9) -->
+                <section class="sessions-section" aria-labelledby="sessions-heading">
+                    <header class="subsection-header">
+                        <h2 id="sessions-heading" class="subsection-title">Active Platform Sessions Audit</h2>
+                    </header>
+
+                    <table class="data-table">
+                        <caption>Table listing authenticated browser and client sessions for {{ current_user.username }}</caption>
+                        <thead>
+                            <tr>
+                                <th scope="col">Device / Web Browser</th>
+                                <th scope="col">Client IP Address</th>
+                                <th scope="col">Authentication State</th>
+                                <th scope="col">Last Event Activity</th>
+                                <th scope="col">Control Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Current Browser Client ({{ request.user_agent.browser | capitalize if request.user_agent.browser else 'Web Client' }})</td>
+                                <td><code>{{ request.remote_addr }}</code></td>
+                                <td><span class="badge badge-success">Active Session</span></td>
+                                <td>Current (Active)</td>
+                                <td><span style="color:#888; font-size: 0.85em;">Current Session</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </section>
+
+            </section>
+
+        </main>
+    </div>
+
+    <!-- Global Platform Footer -->
+    <footer class="main-footer">
+        <div class="footer-content">
+            <p class="copyright-text">&copy; 2026 Threat Intelligence Platform. All Rights Reserved. Securing Assets Globally.</p>
+            <nav class="footer-links" aria-label="Legal Links">
+                <a href="#" class="footer-link">Privacy Policy</a>
+                <span class="separator">|</span>
+                <a href="#" class="footer-link">Terms of Service</a>
+                <span class="separator">|</span>
+                {% if current_user.role == 'admin' %}
+                <a href="{{ url_for('admin.admin') }}" class="footer-link">Security Audit Logs</a>
+                {% endif %}
+            </nav>
+        </div>
+    </footer>
+
+</body>
+</html>

@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>429 Too Many Requests - Threat Intelligence Platform</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="dashboard-page">
+    <header class="main-header">
+        <nav class="navbar dashboard-navbar">
+            <div class="navbar-brand">
+                <a href="{{ url_for('main.home') }}" class="logo-link">
+                    <span class="logo-icon">&#128737;</span>
+                    <span class="logo-text">ThreatIntel Platform</span>
+                </a>
+            </div>
+        </nav>
+    </header>
+    <div class="layout-container" style="display:flex;align-items:center;justify-content:center;min-height:70vh;">
+        <div style="text-align:center;max-width:480px;padding:2rem;">
+            <h1 style="font-size:4rem;color:#f87171;margin-bottom:0.5rem;">429</h1>
+            <h2 style="color:#e2e8f0;margin-bottom:1rem;">Too Many Requests</h2>
+            <p style="color:#94a3b8;margin-bottom:2rem;">
+                Rate limit exceeded. Too many requests have been submitted in a short period. Please wait and try again later.
+            </p>
+            <a href="{{ url_for('dashboard.dashboard') }}" class="btn btn-primary">Return to Dashboard</a>
+        </div>
+    </div>
+</body>
+</html>

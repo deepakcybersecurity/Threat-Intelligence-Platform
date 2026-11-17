@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <meta name="description"
+        content="Live Threat Intelligence Feed. Monitor global Indicators of Compromise, malicious hostnames, phishing domains, and file hashes in real-time.">
+    <title>Live Threat Feed - Threat Intelligence Platform</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="{{ url_for('static', filename='js/1-funtioning.js') }}" defer></script>
+</head>
+
+<body class="dashboard-page">
+
+    <!-- Top Navigation Header -->
+    <header class="main-header">
+        <nav class="navbar dashboard-navbar" aria-label="Main Navigation">
+            <div class="navbar-brand">
+                <a href="{{ url_for('main.home') }}" class="logo-link">
+                    <span class="logo-icon">&#128737;</span>
+                    <span class="logo-text">ThreatIntel Platform</span>
+                </a>
+            </div>
+
+            <!-- Global Quick Search -->
+            <div class="navbar-search">
+                <form action="{{ url_for('dashboard.search_threats') }}" method="GET" class="search-form">
+                    <label for="global-search" class="visually-hidden">Search threats, IPs, hashes</label>
+                    <input type="search" id="global-search" name="query" class="search-input"
+                        placeholder="Search threats, IPs, CVEs...">
+                    <button type="submit" class="search-button">Search</button>
+                </form>
+            </div>
+
+            <div class="navbar-user-menu">
+                <span class="user-role badge-critical">SecOps Admin</span>
+                <a href="{{ url_for('dashboard.profile') }}" class="user-profile-link">Profile Settings</a>
+                <a href="{{ url_for('auth.login') }}" class="logout-link">Sign Out</a>
+            </div>
+        </nav>
+    </header>
+
+    <div class="layout-container">
+
+        <!-- Left Sidebar Navigation -->
+        <aside class="sidebar" aria-label="Sidebar Navigation">
+            <nav class="sidebar-navigation">
+                <ul class="sidebar-menu">
+                    <li><a href="{{ url_for('dashboard.dashboard') }}" class="menu-item">Dashboard Overview</a></li>
+                    <li><a href="{{ url_for('dashboard.threat_feed') }}" class="menu-item active-menu-item">Live Threat
+                            Feed</a></li>
+                    <li><a href="{{ url_for('dashboard.threat_news') }}" class="menu-item">Threat News</a></li>
+                    <li><a href="{{ url_for('dashboard.ip_checker') }}" class="menu-item">IP Address Checker</a></li>
+                    <li><a href="{{ url_for('dashboard.malware_info') }}" class="menu-item">Malware Information</a></li>
+                    <li><a href="{{ url_for('dashboard.threat_report_upload') }}" class="menu-item">Upload Threat
+                            Report</a></li>
+                    <li><a href="{{ url_for('dashboard.search_threats') }}" class="menu-item">Search Threats
+                            Database</a></li>
+                    <li><a href="{{ url_for('dashboard.alerts') }}" class="menu-item">Alerts & Notifications</a></li>
+                    <li><a href="{{ url_for('dashboard.mitre_matrix') }}" class="menu-item">MITRE ATT&CK Matrix</a></li>
+                    <li><a href="{{ url_for('admin.admin') }}" class="menu-item">System Admin Panel</a></li>
+                </ul>
+            </nav>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="dashboard-main-content">
+
+            <section class="threat-feed-section" aria-labelledby="threat-feed-heading">
+                <header class="section-header">
+                    <h1 id="threat-feed-heading" class="page-title">Live Threat Intelligence Feed</h1>
+                    <p class="page-subtitle">Real-time aggregated indicators of compromise (IOC) feed from internal
+                        sensors and global OSINT streams</p>
+                </header>
+
+                <!-- IOC Lifecycle & Expiry Status Banner (Task 13) -->
+                <div class="ioc-expiry-banner" style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 16px 20px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+                    <div style="display: flex; gap: 24px; flex-wrap: wrap; align-items: center;">
+                        <div>
+                            <div style="font-size: 0.8rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em;">Active IOCs</div>
+                            <div id="stat-active-iocs" style="font-size: 1.5rem; font-weight: bold; color: #4ade80;">{{ expiry_stats.active_indicators if expiry_stats else '0' }}</div>
+                        </div>
+                        <div style="border-left: 1px solid rgba(255, 255, 255, 0.1); height: 36px;"></div>
+                        <div>
+                            <div style="font-size: 0.8rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em;">Expired IOCs</div>
+                            <div id="stat-expired-iocs" style="font-size: 1.5rem; font-weight: bold; color: #94a3b8;">{{ expiry_stats.expired_indicators if expiry_stats else '0' }}</div>
+                        </div>
+                        <div style="border-left: 1px solid rgba(255, 255, 255, 0.1); height: 36px;"></div>
+                        <div>
+                            <div style="font-size: 0.8rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em;">Expiring Soon (7d)</div>
+                            <div id="stat-expiring-soon" style="font-size: 1.5rem; font-weight: bold; color: #f59e0b;">{{ expiry_stats.expiring_soon_7d if expiry_stats else '0' }}</div>
+                        </div>
+                        <div style="border-left: 1px solid rgba(255, 255, 255, 0.1); height: 36px;"></div>
+                        <div>
+                            <div style="font-size: 0.8rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em;">Aging Policy (TTL)</div>
+                            <div style="font-size: 0.82rem; color: #cbd5e1; margin-top: 2px;">IP: 30d &bull; Domain: 60d &bull; Hash: 180d &bull; CVE: 365d</div>
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+                        <button type="button" class="btn btn-secondary" onclick="runExpiryJob(true)" style="border: 1px solid #64748b; font-size: 0.85rem; cursor: pointer;">
+                            &#128065; Preview Expiring (Dry-Run)
+                        </button>
+                        <button type="button" id="btn-run-expiry" class="btn btn-primary" onclick="runExpiryJob(false)" style="background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%); border: none; font-size: 0.85rem; cursor: pointer;">
+                            &#9203; Run Expiry Job Now
+                        </button>
+                    </div>
+                </div>
+
+                <!-- IOC Filter Form -->
+                <fieldset class="filter-fieldset">
+                    <legend>Filter Indicators</legend>
+                    <form action="{{ url_for('dashboard.threat_feed') }}" method="GET" class="filter-form">
+                        <div class="form-row" style="display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end;">
+                            <div class="form-group" style="flex: 1; min-width: 140px;">
+                                <label for="indicator-type" class="form-label">Indicator Type</label>
+                                <select id="indicator-type" name="type" class="form-select">
+                                    <option value="all" {% if not current_type or current_type == 'all' %}selected{% endif %}>All Types</option>
+                                    <option value="ip" {% if current_type in ['ip', 'ipv4'] %}selected{% endif %}>IP Address</option>
+                                    <option value="domain" {% if current_type == 'domain' %}selected{% endif %}>Domain Name</option>
+                                    <option value="url" {% if current_type == 'url' %}selected{% endif %}>URL Path</option>
+                                    <option value="hash" {% if current_type == 'hash' %}selected{% endif %}>File Hash (SHA256/MD5)</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group" style="flex: 1; min-width: 130px;">
+                                <label for="indicator-status" class="form-label">Lifecycle Status</label>
+                                <select id="indicator-status" name="status" class="form-select">
+                                    <option value="all" {% if not current_status or current_status == 'all' %}selected{% endif %}>All Statuses</option>
+                                    <option value="Active" {% if current_status and current_status|lower == 'active' %}selected{% endif %}>Active</option>
+                                    <option value="Expired" {% if current_status and current_status|lower == 'expired' %}selected{% endif %}>Expired</option>
+                                    <option value="Inactive" {% if current_status and current_status|lower == 'inactive' %}selected{% endif %}>Inactive</option>
+                                    <option value="False Positive" {% if current_status and current_status|lower == 'false positive' %}selected{% endif %}>False Positive</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group" style="flex: 1; min-width: 130px;">
+                                <label for="severity-level" class="form-label">Severity Level</label>
+                                <select id="severity-level" name="severity" class="form-select">
+                                    <option value="all" {% if not current_severity or current_severity == 'all' %}selected{% endif %}>All Severities</option>
+                                    <option value="critical" {% if current_severity and current_severity|lower == 'critical' %}selected{% endif %}>Critical</option>
+                                    <option value="high" {% if current_severity and current_severity|lower == 'high' %}selected{% endif %}>High</option>
+                                    <option value="medium" {% if current_severity and current_severity|lower == 'medium' %}selected{% endif %}>Medium</option>
+                                    <option value="low" {% if current_severity and current_severity|lower == 'low' %}selected{% endif %}>Low</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group" style="flex: 1; min-width: 140px;">
+                                <label for="source-feed" class="form-label">Intelligence Source</label>
+                                <select id="source-feed" name="source" class="form-select">
+                                    <option value="all" {% if not current_source or current_source == 'all' %}selected{% endif %}>All Feeds</option>
+                                    <option value="shodan" {% if current_source == 'shodan' %}selected{% endif %}>Shodan Scan</option>
+                                    <option value="alienvault" {% if current_source == 'alienvault' %}selected{% endif %}>AlienVault OTX</option>
+                                    <option value="abuse-ch" {% if current_source == 'abuse-ch' %}selected{% endif %}>Abuse.ch URLhaus</option>
+                                    <option value="internal-honeypot" {% if current_source == 'internal-honeypot' %}selected{% endif %}>Internal Honeypot</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group align-bottom-btn" style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                                <button type="submit" class="btn btn-filter btn-primary">Apply Filters</button>
+                                <a href="{{ url_for('dashboard.threat_feed') }}"
+                                    class="btn btn-reset btn-secondary">Clear</a>
+                                <a href="/api/v1/stix/download"
+                                    class="btn btn-secondary" style="border: 1px solid #06b6d4; color: #38bdf8;"
+                                    title="Export all active indicators in OASIS STIX 2.1 JSON standard">&#128229; Export STIX 2.1</a>
+                            </div>
+                        </div>
+                    </form>
+                </fieldset>
+
+                <!-- Threat Feed Table -->
+                <div class="table-container">
+                    <table class="data-table">
+                        <caption>Table showing active cyber threat indicators, classification levels, and associated
+                            details</caption>
+                        <thead>
+                            <tr>
+                                <th scope="col">Detected Time</th>
+                                <th scope="col">Indicator Value</th>
+                                <th scope="col">Type</th>
+                                <th scope="col">Status</th>
+                                <th scope="col">Severity</th>
+                                <th scope="col">Associated Threat / Campaign</th>
+                                <th scope="col">Intelligence Source</th>
+                                <th scope="col">Confidence</th>
+                                <th scope="col">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+
+                        {% if indicators %}
+
+                            {% for indicator in indicators %}
+
+                            <tr>
+
+                                <td>
+
+                                    {{ (indicator.last_seen_at or indicator.created_at).strftime("%d-%m-%Y %H:%M") if (indicator.last_seen_at or indicator.created_at) else "N/A" }}
+
+                                </td>
+
+                                <td>
+
+                                    <code>
+                                        {{ indicator.indicator_value }}
+                                    </code>
+
+                                </td>
+
+                                <td>
+
+                                    {{ indicator.indicator_type }}
+
+                                </td>
+
+                                <td>
+
+                                    {% if indicator.status == "Active" %}
+                                    <span id="status-badge-{{ indicator.id }}" class="badge badge-success">
+                                        Active
+                                    </span>
+                                    {% elif indicator.status == "Expired" %}
+                                    <span id="status-badge-{{ indicator.id }}" class="badge" style="background: #475569; color: #f1f5f9;">
+                                        Expired
+                                    </span>
+                                    {% elif indicator.status == "False Positive" %}
+                                    <span id="status-badge-{{ indicator.id }}" class="badge badge-warning">
+                                        False Positive
+                                    </span>
+                                    {% else %}
+                                    <span id="status-badge-{{ indicator.id }}" class="badge badge-info">
+                                        {{ indicator.status }}
+                                    </span>
+                                    {% endif %}
+
+                                </td>
+
+                                <td>
+
+                                    {% if indicator.severity == "Critical" %}
+                                    <span class="badge badge-critical">
+
+                                        {{ indicator.severity }}
+
+                                    </span>
+
+                                    {% elif indicator.severity == "High" %}
+
+                                    <span class="badge badge-warning">
+
+                                        {{ indicator.severity }}
+
+                                    </span>
+
+                                    {% elif indicator.severity == "Medium" %}
+
+                                    <span class="badge badge-info">
+
+                                        {{ indicator.severity }}
+
+                                    </span>
+
+                                    {% else %}
+
+                                    <span class="badge badge-success">
+
+                                        {{ indicator.severity }}
+
+                                    </span>
+
+                                    {% endif %}
+
+                                </td>
+
+                                <td>
+
+                                    {{ indicator.context or "N/A" }}
+
+                                </td>
+
+                                <td>
+
+                                    {{ indicator.source }}
+
+                                </td>
+
+                                <td>
+
+                                    {{ indicator.confidence_score }}%
+                                    {% if indicator.risk_score is not none %}
+                                    <div style="margin-top: 4px;">
+                                        <span class="badge {% if indicator.risk_score >= 75 %}badge-critical{% elif indicator.risk_score >= 50 %}badge-warning{% elif indicator.risk_score >= 25 %}badge-info{% else %}badge-success{% endif %}" style="font-size: 0.72rem; padding: 2px 6px;" title="Persisted Risk Score">
+                                            Risk: {{ indicator.risk_score }}
+                                        </span>
+                                    </div>
+                                    {% endif %}
+
+                                </td>
+
+                                <td>
+
+                                    {% if indicator.indicator_type|lower in ["ip", "ipv4"] %}
+
+                                    <a href="{{ url_for('dashboard.ip_checker') }}?ip={{ indicator.indicator_value }}"
+                                        class="btn-table-action">
+
+                                        Check IP
+
+                                    </a>
+
+                                    {% else %}
+
+                                    <a href="{{ url_for('dashboard.search_threats') }}?query={{ indicator.indicator_value }}"
+                                        class="btn-table-action">
+
+                                        Find Similar
+
+                                    </a>
+
+                                    {% endif %}
+
+                                    <button type="button"
+                                        class="btn-table-action"
+                                        style="cursor: pointer;"
+                                        onclick="enrichIndicator({{ indicator.id }}, this)">
+                                        Enrich
+                                    </button>
+
+                                    <button type="button"
+                                        class="btn-table-action"
+                                        style="cursor: pointer;"
+                                        onclick="viewCorrelations({{ indicator.id }}, this)">
+                                        Correlations
+                                    </button>
+
+                                    <button type="button"
+                                        class="btn-table-action"
+                                        style="cursor: pointer;"
+                                        onclick="viewRiskScore({{ indicator.id }}, this)">
+                                        Risk Score
+                                    </button>
+
+                                    {% if indicator.status == "Expired" %}
+                                    <button type="button"
+                                        id="reactivate-btn-{{ indicator.id }}"
+                                        class="btn-table-action"
+                                        style="cursor: pointer; color: #4ade80; border: 1px solid #22c55e; font-weight: 600;"
+                                        title="Reactivate indicator back to Active status"
+                                        onclick="reactivateIndicator({{ indicator.id }}, this)">
+                                        &#8635; Reactivate
+                                    </button>
+                                    {% endif %}
+
+                                </td>
+
+                            </tr>
+
+                            <tr id="enrich-row-{{ indicator.id }}" style="display: none; background: rgba(15, 23, 42, 0.65);">
+                                <td colspan="9" style="padding: 12px 18px;">
+                                    <div id="enrich-result-{{ indicator.id }}" style="font-size: 0.9rem;">
+                                        Loading external threat intelligence...
+                                    </div>
+                                </td>
+                            </tr>
+
+                            <tr id="correlation-row-{{ indicator.id }}" style="display: none; background: rgba(15, 23, 42, 0.85);">
+                                <td colspan="9" style="padding: 14px 20px;">
+                                    <div id="correlation-result-{{ indicator.id }}" style="font-size: 0.9rem;">
+                                        Analyzing relational threat intelligence...
+                                    </div>
+                                </td>
+                            </tr>
+
+                            <tr id="risk-row-{{ indicator.id }}" style="display: none; background: rgba(15, 23, 42, 0.85);">
+                                <td colspan="9" style="padding: 14px 20px;">
+                                    <div id="risk-result-{{ indicator.id }}" style="font-size: 0.9rem;">
+                                        Calculating deterministic IOC risk score...
+                                    </div>
+                                </td>
+                            </tr>
+
+                            {% endfor %}
+
+                            {% else %}
+
+                            <tr>
+
+                                <td colspan="9" style="text-align:center;">
+
+                                    No Threat Indicators Available.
+
+                                </td>
+
+                            </tr>
+
+                            {% endif %}
+
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Pagination Section -->
+                <nav class="pagination-nav" aria-label="Threat Feed Pagination">
+                    <ul class="pagination-list">
+                        <li><span class="pagination-item disabled-item">&laquo; Previous</span></li>
+                        <li><span class="pagination-item current-item" aria-current="page">1</span></li>
+                        <li><a href="#" class="pagination-item">2</a></li>
+                        <li><a href="#" class="pagination-item">3</a></li>
+                        <li><a href="#" class="pagination-item">4</a></li>
+                        <li><span class="pagination-ellipsis">...</span></li>
+                        <li><a href="#" class="pagination-item">42</a></li>
+                        <li><a href="#" class="pagination-item">Next &raquo;</a></li>
+                    </ul>
+                </nav>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- Global Platform Footer -->
+    <footer class="main-footer">
+        <div class="footer-content">
+            <p class="copyright-text">&copy; 2026 Threat Intelligence Platform. All Rights Reserved. Securing Assets
+                Globally.</p>
+            <nav class="footer-links" aria-label="Legal Links">
+                <a href="#" class="footer-link">Privacy Policy</a>
+                <span class="separator">|</span>
+                <a href="#" class="footer-link">Terms of Service</a>
+                <span class="separator">|</span>
+                <a href="#" class="footer-link">Security Audit Logs</a>
+            </nav>
+        </div>
+    </footer>
+
+    <script>
+    function enrichIndicator(indicatorId, btnElement) {
+        const row = document.getElementById('enrich-row-' + indicatorId);
+        const container = document.getElementById('enrich-result-' + indicatorId);
+        if (!row || !container) return;
+
+        if (row.style.display !== 'none' && container.getAttribute('data-loaded') === 'true') {
+            row.style.display = 'none';
+            btnElement.textContent = 'Enrich';
+            return;
+        }
+
+        row.style.display = 'table-row';
+        btnElement.textContent = 'Hide Intel';
+
+        if (container.getAttribute('data-loaded') === 'true') {
+            return;
+        }
+
+        container.innerHTML = '<span style="color: #94a3b8;">Contacting external threat intelligence provider...</span>';
+
+        fetch('/threat-indicator/' + indicatorId + '/enrich', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+            }
+        })
+        .then(res => res.json())
+        .then(res => {
+            container.setAttribute('data-loaded', 'true');
+            if (!res.success) {
+                container.innerHTML = '<div style="color: #ef4444; padding: 4px 0;"><strong>Enrichment Notice:</strong> ' + (res.error || 'Failed to retrieve intelligence') + '</div>';
+                return;
+            }
+
+            const data = res.data || {};
+            const cacheBadge = res.cached ? '<span class="badge badge-info" style="margin-left: 8px;">Cached (24h)</span>' : '<span class="badge badge-success" style="margin-left: 8px;">Live Intel</span>';
+            let html = '<div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px; margin-bottom: 10px;">';
+            html += '<div><strong>Provider:</strong> <span class="badge badge-warning">' + (res.provider || 'External') + '</span>' + cacheBadge + '</div>';
+            html += '<button type="button" class="btn-table-action" onclick="document.getElementById(\'enrich-row-' + indicatorId + '\').style.display=\'none\'; btnElement.textContent=\'Enrich\';">Close</button></div>';
+
+            if (res.provider === 'AbuseIPDB') {
+                html += '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px;">';
+                html += '<div><strong>IP:</strong> ' + (data.ip_address || res.indicator) + '</div>';
+                html += '<div><strong>Abuse Score:</strong> <span class="badge ' + (data.abuse_confidence_score > 50 ? 'badge-critical' : (data.abuse_confidence_score > 20 ? 'badge-warning' : 'badge-success')) + '">' + (data.abuse_confidence_score || 0) + '%</span></div>';
+                html += '<div><strong>ISP:</strong> ' + (data.isp || 'N/A') + '</div>';
+                html += '<div><strong>Country:</strong> ' + (data.country_name || data.country_code || 'N/A') + '</div>';
+                html += '<div><strong>Total Reports:</strong> ' + (data.total_reports || 0) + '</div>';
+                html += '<div><strong>Tor Node:</strong> ' + (data.is_tor ? '<span class="badge badge-critical">Yes</span>' : 'No') + '</div>';
+                html += '</div>';
+            } else if (res.provider === 'VirusTotal') {
+                html += '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px;">';
+                html += '<div><strong>Hash:</strong> <code>' + (data.hash || res.indicator) + '</code></div>';
+                html += '<div><strong>Malicious Detections:</strong> <span class="badge ' + (data.malicious_count > 0 ? 'badge-critical' : 'badge-success') + '">' + (data.malicious_count || 0) + ' vendors</span></div>';
+                html += '<div><strong>Suspicious:</strong> ' + (data.suspicious_count || 0) + '</div>';
+                html += '<div><strong>Undetected:</strong> ' + (data.undetected_count || 0) + '</div>';
+                html += '<div><strong>Meaningful Name:</strong> ' + (data.meaningful_name || 'N/A') + '</div>';
+                html += '<div><strong>Reputation:</strong> ' + (data.reputation || 0) + '</div>';
+                html += '</div>';
+            } else if (res.provider === 'AlienVault OTX') {
+                html += '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-bottom: 8px;">';
+                html += '<div><strong>Target:</strong> <code>' + (data.indicator || res.indicator) + '</code></div>';
+                html += '<div><strong>Pulse Count:</strong> <span class="badge ' + (data.pulse_count > 0 ? 'badge-warning' : 'badge-info') + '">' + (data.pulse_count || 0) + ' pulses</span></div>';
+                html += '<div><strong>Last Updated:</strong> ' + (data.last_updated || 'N/A') + '</div>';
+                html += '</div>';
+                if (data.pulses && data.pulses.length > 0) {
+                    html += '<div><strong>Top Threat Pulses:</strong><ul style="margin: 6px 0 0 18px; padding: 0;">';
+                    data.pulses.forEach(p => {
+                        html += '<li>' + (p.name || 'Unnamed Pulse') + ' <span style="color:#64748b; font-size:0.8rem;">(' + (p.created ? p.created.substring(0, 10) : '') + ')</span></li>';
+                    });
+                    html += '</ul></div>';
+                }
+            }
+            container.innerHTML = html;
+        })
+        .catch(err => {
+            container.innerHTML = '<div style="color: #ef4444; padding: 4px 0;"><strong>Request Failed:</strong> ' + err.message + '</div>';
+        });
+    }
+
+    function viewCorrelations(indicatorId, btnElement) {
+        const row = document.getElementById('correlation-row-' + indicatorId);
+        const container = document.getElementById('correlation-result-' + indicatorId);
+        if (!row || !container) return;
+
+        if (row.style.display !== 'none' && container.getAttribute('data-loaded') === 'true') {
+            row.style.display = 'none';
+            btnElement.textContent = 'Correlations';
+            return;
+        }
+
+        row.style.display = 'table-row';
+        btnElement.textContent = 'Hide Intel';
+
+        if (container.getAttribute('data-loaded') === 'true') {
+            return;
+        }
+
+        container.innerHTML = '<span style="color: #94a3b8;">Analyzing relational intelligence across reports and malware...</span>';
+
+        fetch('/threat-indicator/' + indicatorId + '/correlations', {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(res => res.json())
+        .then(res => {
+            container.setAttribute('data-loaded', 'true');
+            if (!res.success) {
+                container.innerHTML = '<div style="color: #ef4444; padding: 4px 0;"><strong>Correlation Notice:</strong> ' + (res.error || 'Unable to load correlation data.') + '</div>';
+                return;
+            }
+
+            const summary = res.summary || {};
+            const reports = res.reports || [];
+            const malware = res.malware || [];
+            const related = res.related_indicators || [];
+
+            let html = '<div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.12); padding-bottom: 8px; margin-bottom: 12px;">';
+            html += '<div><strong>Relational Intelligence:</strong> ';
+            html += '<span class="badge badge-info" style="margin-left: 6px;">Reports: ' + (summary.report_count || 0) + '</span> ';
+            html += '<span class="badge badge-warning" style="margin-left: 4px;">Malware: ' + (summary.malware_count || 0) + '</span> ';
+            html += '<span class="badge badge-critical" style="margin-left: 4px;">Connected IOCs: ' + (summary.related_indicator_count || 0) + '</span>';
+            if (res.correlation_score > 0) {
+                html += ' <span class="badge badge-success" style="margin-left: 4px;">Strength: ' + res.correlation_score + '</span>';
+            }
+            html += '</div>';
+            html += '<button type="button" class="btn-table-action" onclick="document.getElementById(\'correlation-row-' + indicatorId + '\').style.display=\'none\'; btnElement.textContent=\'Correlations\';">Close</button></div>';
+
+            if (reports.length === 0 && malware.length === 0 && related.length === 0) {
+                html += '<div style="color: #94a3b8; font-style: italic; padding: 6px 0;">No related intelligence found for this indicator.</div>';
+                container.innerHTML = html;
+                return;
+            }
+
+            // Reports Section
+            if (reports.length > 0) {
+                html += '<div style="margin-bottom: 12px;"><h4 style="margin: 0 0 6px 0; color: #38bdf8; font-size: 0.95rem;">Associated Threat Reports (' + reports.length + ')</h4>';
+                html += '<ul style="margin: 0; padding-left: 20px;">';
+                reports.forEach(r => {
+                    const sevClass = r.severity.toLowerCase() === 'critical' ? 'badge-critical' : (r.severity.toLowerCase() === 'high' ? 'badge-warning' : 'badge-info');
+                    html += '<li style="margin-bottom: 4px;"><strong>' + r.title + '</strong> <span class="badge ' + sevClass + '">' + r.severity + '</span> <span style="color:#94a3b8; font-size:0.8rem;">(TLP:' + r.tlp_level + ' | ' + (r.created_at || 'N/A') + ')</span></li>';
+                });
+                html += '</ul></div>';
+            }
+
+            // Malware Section
+            if (malware.length > 0) {
+                html += '<div style="margin-bottom: 12px;"><h4 style="margin: 0 0 6px 0; color: #f59e0b; font-size: 0.95rem;">Associated Malware Records (' + malware.length + ')</h4>';
+                html += '<ul style="margin: 0; padding-left: 20px;">';
+                malware.forEach(m => {
+                    html += '<li style="margin-bottom: 4px;"><strong>' + m.name + '</strong> (' + m.family + ' / ' + m.type + ') <span class="badge badge-warning">' + m.severity + '</span> <span style="color:#94a3b8; font-size:0.8rem;">[Risk: ' + m.risk_score + ' | MITRE: ' + m.mitre_attack_id + ']</span></li>';
+                });
+                html += '</ul></div>';
+            }
+
+            // Related Indicators Section
+            if (related.length > 0) {
+                html += '<div><h4 style="margin: 0 0 6px 0; color: #ec4899; font-size: 0.95rem;">Connected Indicators (' + related.length + ')</h4>';
+                html += '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 8px;">';
+                related.forEach(ioc => {
+                    const reasonBadge = ioc.relationship_reason.includes('+') ? 'badge-critical' : (ioc.relationship_reason.includes('Malware') ? 'badge-warning' : 'badge-info');
+                    html += '<div style="background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(255,255,255,0.08); border-radius: 4px; padding: 8px 10px;">';
+                    html += '<div><code>' + ioc.value + '</code> <span style="color:#94a3b8; font-size:0.8rem;">(' + ioc.type + ')</span></div>';
+                    html += '<div style="margin-top: 4px;"><span class="badge ' + reasonBadge + '" style="font-size:0.75rem;">' + ioc.relationship_reason + '</span></div>';
+                    html += '</div>';
+                });
+                html += '</div></div>';
+            }
+
+            container.innerHTML = html;
+        })
+        .catch(err => {
+            container.innerHTML = '<div style="color: #ef4444; padding: 4px 0;"><strong>Request Failed:</strong> ' + err.message + '</div>';
+        });
+    }
+
+    function viewRiskScore(indicatorId, btnElement) {
+        const row = document.getElementById('risk-row-' + indicatorId);
+        const container = document.getElementById('risk-result-' + indicatorId);
+        if (!row || !container) return;
+
+        if (row.style.display !== 'none' && container.getAttribute('data-loaded') === 'true') {
+            row.style.display = 'none';
+            btnElement.textContent = 'Risk Score';
+            return;
+        }
+
+        row.style.display = 'table-row';
+        btnElement.textContent = 'Hide Intel';
+
+        if (container.getAttribute('data-loaded') === 'true') {
+            return;
+        }
+
+        container.innerHTML = '<span style="color: #94a3b8;">Calculating deterministic IOC risk score...</span>';
+
+        fetch('/threat-indicator/' + indicatorId + '/risk-score', {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(res => res.json())
+        .then(res => {
+            container.setAttribute('data-loaded', 'true');
+            if (!res.success) {
+                container.innerHTML = '<div style="color: #ef4444; padding: 4px 0;"><strong>Risk Scoring Notice:</strong> ' + (res.error || 'Unable to calculate risk score.') + '</div>';
+                return;
+            }
+
+            const score = res.risk_score;
+            const level = res.risk_level;
+            const bd = res.breakdown || {};
+            const exp = res.explanation || {};
+
+            let levelBadgeClass = 'badge-success';
+            if (level === 'CRITICAL') levelBadgeClass = 'badge-critical';
+            else if (level === 'HIGH') levelBadgeClass = 'badge-warning';
+            else if (level === 'MEDIUM') levelBadgeClass = 'badge-info';
+
+            let html = '<div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.12); padding-bottom: 8px; margin-bottom: 12px;">';
+            html += '<div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">';
+            html += '<strong>Risk Assessment:</strong>';
+            html += '<span style="font-size: 1.15rem; font-weight: bold; color: #38bdf8;">' + score + ' / 100</span>';
+            html += '<span class="badge ' + levelBadgeClass + '" style="font-size: 0.85rem;">' + level + '</span>';
+            html += '<button type="button" class="btn-table-action" id="save-risk-btn-' + indicatorId + '" onclick="persistRiskScore(' + indicatorId + ', this)" style="margin-left: 8px; cursor: pointer;">Save Score to DB</button>';
+            html += '</div>';
+            html += '<button type="button" class="btn-table-action" onclick="document.getElementById(\'risk-row-' + indicatorId + '\').style.display=\'none\'; btnElement.textContent=\'Risk Score\';">Close</button></div>';
+
+            html += '<div style="margin-bottom: 8px;"><h4 style="margin: 0 0 8px 0; color: #94a3b8; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em;">Deterministic Score Breakdown</h4></div>';
+            html += '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px;">';
+
+            const factors = [
+                { label: 'Severity', pts: bd.severity, max: 50, detail: exp.severity, color: '#f87171' },
+                { label: 'Confidence', pts: bd.confidence, max: 20, detail: exp.confidence, color: '#fbbf24' },
+                { label: 'Correlation', pts: bd.correlation, max: 20, detail: exp.correlation, color: '#a78bfa' },
+                { label: 'Enrichment', pts: bd.enrichment, max: 10, detail: exp.enrichment, color: '#38bdf8' },
+                { label: 'Recency', pts: bd.recency, max: 5, detail: exp.recency, color: '#4ade80' },
+                { label: 'Status', pts: bd.status, max: 5, detail: exp.status, color: '#2dd4bf' }
+            ];
+
+            factors.forEach(f => {
+                html += '<div style="background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(255,255,255,0.08); border-radius: 4px; padding: 10px 12px;">';
+                html += '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">';
+                html += '<strong style="color: ' + f.color + '; font-size: 0.9rem;">' + f.label + '</strong>';
+                html += '<span style="font-weight: bold; font-size: 0.95rem;">+' + (f.pts || 0) + ' <span style="font-size: 0.75rem; color: #64748b;">(max ' + f.max + ')</span></span>';
+                html += '</div>';
+                html += '<div style="color: #cbd5e1; font-size: 0.8rem; line-height: 1.3;">' + (f.detail || 'N/A') + '</div>';
+                html += '</div>';
+            });
+
+            html += '</div>';
+            container.innerHTML = html;
+        })
+        .catch(err => {
+            container.innerHTML = '<div style="color: #ef4444; padding: 4px 0;"><strong>Request Failed:</strong> ' + err.message + '</div>';
+        });
+    }
+
+    function persistRiskScore(indicatorId, saveBtn) {
+        if (!saveBtn) return;
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Saving...';
+
+        fetch('/threat-indicator/' + indicatorId + '/risk-score', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+            }
+        })
+        .then(res => res.json())
+        .then(res => {
+            if (res.success) {
+                saveBtn.textContent = 'Saved (' + res.risk_score + ')';
+                saveBtn.style.color = '#4ade80';
+            } else {
+                saveBtn.textContent = 'Save Failed';
+                saveBtn.disabled = false;
+            }
+        })
+        .catch(err => {
+            saveBtn.textContent = 'Error';
+            saveBtn.disabled = false;
+        });
+    }
+
+    function runExpiryJob(dryRun) {
+        const btn = document.getElementById('btn-run-expiry');
+        const modal = document.getElementById('expiry-result-modal');
+        const modalContent = document.getElementById('expiry-result-content');
+
+        if (!confirm(dryRun ? 'Preview which active indicators are older than their TTL policy?' : 'Are you sure you want to run the automated IOC expiry job now? Aged indicators will be transitioned to Expired.')) {
+            return;
+        }
+
+        if (btn && !dryRun) {
+            btn.disabled = true;
+            btn.textContent = 'Expiring...';
+        }
+
+        fetch('/api/v1/ioc/expire?dry_run=' + (dryRun ? 'true' : 'false'), {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+            }
+        })
+        .then(res => res.json())
+        .then(res => {
+            if (btn && !dryRun) {
+                btn.disabled = false;
+                btn.textContent = '⏱ Run Expiry Job Now';
+            }
+
+            if (!res.success) {
+                alert('IOC Expiry Error: ' + (res.message || 'Execution failed'));
+                return;
+            }
+
+            const modeLabel = res.dry_run ? 'Simulation (Dry-Run)' : 'Live Expiry Completed';
+            const count = res.expired_count;
+            const evalCount = res.evaluated_count;
+
+            let html = '<div style="margin-bottom: 12px;"><h3 style="margin: 0 0 6px 0; color: ' + (res.dry_run ? '#38bdf8' : '#4ade80') + ';">' + modeLabel + '</h3>';
+            html += '<p style="margin: 0; color: #94a3b8; font-size: 0.9rem;">Evaluated <strong>' + evalCount + '</strong> active indicators. <strong>' + count + '</strong> indicators ' + (res.dry_run ? 'are eligible to expire' : 'have been transitioned to Expired') + '.</p></div>';
+
+            if (res.breakdown_by_type && Object.keys(res.breakdown_by_type).length > 0) {
+                html += '<div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px;">';
+                for (const [k, v] of Object.entries(res.breakdown_by_type)) {
+                    html += '<span class="badge badge-info" style="font-size: 0.85rem; padding: 4px 8px;">' + k.toUpperCase() + ': ' + v + '</span>';
+                }
+                html += '</div>';
+            }
+
+            if (res.expired_indicators && res.expired_indicators.length > 0) {
+                html += '<div style="max-height: 220px; overflow-y: auto; background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255,255,255,0.08); border-radius: 4px; padding: 10px; margin-bottom: 10px;">';
+                html += '<table style="width: 100%; font-size: 0.85rem; border-collapse: collapse;">';
+                html += '<tr style="border-bottom: 1px solid rgba(255,255,255,0.1); color: #94a3b8; text-align: left;"><th>Type</th><th>Value</th><th>Age</th><th>TTL</th></tr>';
+                res.expired_indicators.slice(0, 50).forEach(ind => {
+                    html += '<tr style="border-bottom: 1px solid rgba(255,255,255,0.04);"><td style="padding: 4px 2px;">' + ind.type + '</td><td style="padding: 4px 2px;"><code>' + ind.value + '</code></td><td style="padding: 4px 2px;">' + ind.age_days + 'd</td><td style="padding: 4px 2px;">' + ind.ttl_days + 'd</td></tr>';
+                });
+                html += '</table></div>';
+            } else {
+                html += '<div style="color: #4ade80; font-size: 0.9rem; padding: 6px 0;">No indicators currently meet or exceed their TTL expiration threshold. Feed is up to date!</div>';
+            }
+
+            html += '<div style="margin-top: 16px; display: flex; justify-content: flex-end; gap: 10px;">';
+            if (!res.dry_run && count > 0) {
+                html += '<button type="button" class="btn btn-primary" onclick="window.location.reload()">Reload Feed</button>';
+            }
+            html += '<button type="button" class="btn btn-secondary" onclick="document.getElementById(\'expiry-result-modal\').style.display=\'none\'">Close</button>';
+            html += '</div>';
+
+            modalContent.innerHTML = html;
+            modal.style.display = 'flex';
+        })
+        .catch(err => {
+            if (btn && !dryRun) {
+                btn.disabled = false;
+                btn.textContent = '⏱ Run Expiry Job Now';
+            }
+            alert('Request failed: ' + err.message);
+        });
+    }
+
+    function reactivateIndicator(indicatorId, btnElement) {
+        if (!confirm('Reactivate this indicator back to Active status?')) {
+            return;
+        }
+
+        btnElement.disabled = true;
+        btnElement.textContent = 'Reactivating...';
+
+        fetch('/threat-indicator/' + indicatorId + '/reactivate', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+            },
+            body: JSON.stringify({ reason: 'Analyst manual reactivation via Threat Feed UI' })
+        })
+        .then(res => res.json())
+        .then(res => {
+            if (res.success) {
+                btnElement.textContent = '✓ Active';
+                btnElement.style.color = '#4ade80';
+                btnElement.style.borderColor = '#22c55e';
+                const badge = document.getElementById('status-badge-' + indicatorId);
+                if (badge) {
+                    badge.className = 'badge badge-success';
+                    badge.style.background = '';
+                    badge.style.color = '';
+                    badge.textContent = 'Active';
+                }
+                const activeStat = document.getElementById('stat-active-iocs');
+                const expiredStat = document.getElementById('stat-expired-iocs');
+                if (activeStat && expiredStat) {
+                    activeStat.textContent = parseInt(activeStat.textContent || '0') + 1;
+                    expiredStat.textContent = Math.max(0, parseInt(expiredStat.textContent || '0') - 1);
+                }
+            } else {
+                btnElement.disabled = false;
+                btnElement.textContent = 'Reactivate Failed';
+                alert(res.message || 'Failed to reactivate indicator');
+            }
+        })
+        .catch(err => {
+            btnElement.disabled = false;
+            btnElement.textContent = 'Reactivate';
+            alert('Request failed: ' + err.message);
+        });
+    }
+    </script>
+
+    <!-- Expiry Results Modal -->
+    <div id="expiry-result-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 9999; align-items: center; justify-content: center; padding: 20px;">
+        <div style="background: #1e293b; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; width: 100%; max-width: 600px; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);">
+            <div id="expiry-result-content"></div>
+        </div>
+    </div>
+
+</body>
+
+</html>

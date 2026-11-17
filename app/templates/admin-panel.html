@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="System Administration Panel. Manage user access, configure intelligence feeds, inspect audit trails, and monitor system resources.">
+    <title>Admin Panel - Threat Intelligence Platform</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="{{ url_for('static', filename='js/1-funtioning.js') }}" defer></script>
+</head>
+<body class="dashboard-page">
+
+    <!-- Top Navigation Header -->
+    <header class="main-header">
+        <nav class="navbar dashboard-navbar" aria-label="Main Navigation">
+            <div class="navbar-brand">
+                <a href="{{ url_for('main.home') }}" class="logo-link">
+                    <span class="logo-icon">&#128737;</span>
+                    <span class="logo-text">ThreatIntel Platform</span>
+                </a>
+            </div>
+
+            <!-- Global Quick Search -->
+            <div class="navbar-search">
+                <form action="{{ url_for('dashboard.search_threats') }}" method="GET" class="search-form">
+                    <label for="global-search" class="visually-hidden">Search threats, IPs, hashes</label>
+                    <input type="search" id="global-search" name="query" class="search-input" placeholder="Search threats, IPs, CVEs...">
+                    <button type="submit" class="search-button">Search</button>
+                </form>
+            </div>
+
+            <div class="navbar-user-menu">
+                <span class="user-role badge-critical">{{ current_user.role | upper }}</span>
+                <a href="{{ url_for('dashboard.profile') }}" class="user-profile-link">{{ current_user.username }}</a>
+                <a href="{{ url_for('auth.logout') }}" class="logout-link">Sign Out</a>
+            </div>
+        </nav>
+    </header>
+
+    <div class="layout-container">
+        
+        <!-- Left Sidebar Navigation -->
+        <aside class="sidebar" aria-label="Sidebar Navigation">
+            <nav class="sidebar-navigation">
+                <ul class="sidebar-menu">
+                    <li><a href="{{ url_for('dashboard.dashboard') }}" class="menu-item">Dashboard Overview</a></li>
+                    <li><a href="{{ url_for('dashboard.threat_feed') }}" class="menu-item">Live Threat Feed</a></li>
+                    <li><a href="{{ url_for('dashboard.ip_checker') }}" class="menu-item">IP Address Checker</a></li>
+                    <li><a href="{{ url_for('dashboard.malware_info') }}" class="menu-item">Malware Information</a></li>
+                    <li><a href="{{ url_for('dashboard.threat_report_upload') }}" class="menu-item">Upload Threat Report</a></li>
+                    <li><a href="{{ url_for('dashboard.search_threats') }}" class="menu-item">Search Threats Database</a></li>
+                    <li><a href="{{ url_for('dashboard.alerts') }}" class="menu-item">Alerts &amp; Notifications</a></li>
+                    <li><a href="{{ url_for('admin.admin') }}" class="menu-item active-menu-item">System Admin Panel</a></li>
+                </ul>
+            </nav>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="dashboard-main-content">
+            
+            <!-- Flash Messages -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+            <div class="flash-messages" role="alert">
+                {% for category, message in messages %}
+                <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            </div>
+            {% endif %}
+            {% endwith %}
+
+            <section class="admin-panel-section" aria-labelledby="admin-heading">
+                <header class="section-header">
+                    <h1 id="admin-heading" class="page-title">System Administration Workspace</h1>
+                    <p class="page-subtitle">Configure directory users, track analyst performance, review compliance audit trails, and govern system access</p>
+                </header>
+
+                <!-- System Performance Status Grid -->
+                <section class="system-status-section" aria-labelledby="system-stats-title">
+                    <h2 id="system-stats-title" class="visually-hidden">System Performance Stats</h2>
+                    <div class="dashboard-cards-grid">
+                        <article class="dashboard-card stat-card">
+                            <h3>Registered Users</h3>
+                            <p><strong>{{ users | length }}</strong></p>
+                            <small>Active: {{ users | selectattr('is_active') | list | length }} / Suspended: {{ users | rejectattr('is_active') | list | length }}</small>
+                        </article>
+                        <article class="dashboard-card stat-card">
+                            <h3>Admin Accounts</h3>
+                            <p><strong>{{ users | selectattr('role', 'equalto', 'admin') | list | length }}</strong></p>
+                            <small>Analysts: {{ users | selectattr('role', 'equalto', 'analyst') | list | length }}</small>
+                        </article>
+                        <article class="dashboard-card stat-card">
+                            <h3>Audit Log Entries</h3>
+                            <p><strong>{{ audit_pagination.total_count if audit_pagination else audit_logs | length }}</strong></p>
+                            <small>Filterable compliance events</small>
+                        </article>
+                        <article class="dashboard-card stat-card">
+                            <h3>Session User</h3>
+                            <p><strong>{{ current_user.username }}</strong></p>
+                            <small>Role: {{ current_user.role | capitalize }}</small>
+                        </article>
+                    </div>
+                </section>
+
+                <hr class="section-divider">
+
+                <!-- ══════════════════════════════════════════════════════════ -->
+                <!-- G-8: Analyst Activity & Contribution Metrics Section      -->
+                <!-- ══════════════════════════════════════════════════════════ -->
+                <section class="admin-subsection" aria-labelledby="analyst-metrics-heading">
+                    <header class="subsection-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;">
+                        <div>
+                            <h2 id="analyst-metrics-heading" class="subsection-title">Analyst Activity &amp; SOC Contribution Metrics</h2>
+                            <p class="page-subtitle" style="margin-top:0.25rem;">Contribution tracking across IOCs ingested, advisories published, malware cataloged, and incident alerts resolved</p>
+                        </div>
+                        {% if analyst_metrics and analyst_metrics.summary.top_contributor %}
+                        <div class="top-contributor-pill" style="background:rgba(59,130,246,0.15);border:1px solid rgba(59,130,246,0.4);padding:0.4rem 0.9rem;border-radius:6px;font-size:0.85rem;">
+                            🏆 <strong>Top Contributor:</strong> <span style="color:#60a5fa;">{{ analyst_metrics.summary.top_contributor.username }}</span> ({{ analyst_metrics.summary.top_contributor.total_contributions }} contributions)
+                        </div>
+                        {% endif %}
+                    </header>
+
+                    {% if analyst_metrics %}
+                    <div class="dashboard-cards-grid" style="margin-bottom:1.5rem;">
+                        <article class="dashboard-card stat-card">
+                            <h3>Total IOCs Ingested</h3>
+                            <p><strong>{{ analyst_metrics.summary.total_indicators }}</strong></p>
+                            <small>Network, domain, hash observables</small>
+                        </article>
+                        <article class="dashboard-card stat-card">
+                            <h3>Threat Reports Published</h3>
+                            <p><strong>{{ analyst_metrics.summary.total_reports }}</strong></p>
+                            <small>Advisory &amp; assessment files</small>
+                        </article>
+                        <article class="dashboard-card stat-card">
+                            <h3>Malware Cataloged</h3>
+                            <p><strong>{{ analyst_metrics.summary.total_malware }}</strong></p>
+                            <small>Known malware threat profiles</small>
+                        </article>
+                        <article class="dashboard-card stat-card">
+                            <h3>Alerts Resolved</h3>
+                            <p><strong>{{ analyst_metrics.summary.total_alerts_resolved }}</strong></p>
+                            <small>Mitigated SOC security alerts</small>
+                        </article>
+                    </div>
+
+                    <table class="data-table">
+                        <caption>Analyst operational output and activity breakdown</caption>
+                        <thead>
+                            <tr>
+                                <th scope="col">Analyst User</th>
+                                <th scope="col">Security Role</th>
+                                <th scope="col">Account Status</th>
+                                <th scope="col">Indicators Created</th>
+                                <th scope="col">Reports Published</th>
+                                <th scope="col">Malware Cataloged</th>
+                                <th scope="col">Alerts Handled</th>
+                                <th scope="col">Total Impact</th>
+                                <th scope="col">Last Active</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for m in analyst_metrics.users %}
+                            <tr>
+                                <td><strong>{{ m.username }}</strong><br><small style="color:#64748b;">{{ m.email }}</small></td>
+                                <td><span class="user-role badge-secondary">{{ m.role | upper }}</span></td>
+                                <td>
+                                    {% if m.is_locked %}
+                                    <span class="badge badge-critical" title="Account locked">Locked</span>
+                                    {% elif m.is_active %}
+                                    <span class="badge badge-success">Active</span>
+                                    {% else %}
+                                    <span class="badge badge-warning">Suspended</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ m.indicators_count }}</td>
+                                <td>{{ m.reports_count }}</td>
+                                <td>{{ m.malware_count }}</td>
+                                <td>{{ m.alerts_count }}</td>
+                                <td><strong style="color:var(--accent-color, #38bdf8);">{{ m.total_contributions }}</strong></td>
+                                <td>
+                                    {% if m.last_active %}
+                                    {{ m.last_active.strftime('%Y-%m-%d %H:%M') }}
+                                    {% else %}
+                                    <span style="color:#64748b;">Never</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="9" style="text-align:center;color:#888;">No analyst activity records found.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% endif %}
+                </section>
+
+                <hr class="section-divider">
+
+                <!-- ══════════════════════════════════════════════════════════ -->
+                <!-- G-10: User Management Table with Bulk Actions             -->
+                <!-- ══════════════════════════════════════════════════════════ -->
+                <section class="admin-subsection" aria-labelledby="user-mgmt-heading">
+                    <header class="subsection-header">
+                        <h2 id="user-mgmt-heading" class="subsection-title">User Account &amp; Permission Management</h2>
+                    </header>
+
+                    <!-- Bulk Actions Control Bar -->
+                    <form id="bulkUserForm" action="{{ url_for('admin.admin') }}" method="POST" class="bulk-action-bar"
+                          style="display:flex;align-items:center;gap:0.75rem;margin-bottom:1rem;background:var(--bg-secondary, #1e293b);padding:0.75rem 1rem;border-radius:6px;border:1px solid var(--border-color, #334155);flex-wrap:wrap;">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <input type="hidden" name="action" value="bulk_action">
+
+                        <span style="font-size:0.9rem;font-weight:600;color:var(--text-primary, #f8fafc);">
+                            Bulk Operations (<span id="selectedUsersCount">0</span> selected):
+                        </span>
+
+                        <select id="bulkTypeSelect" name="bulk_type" class="form-select select-compact" style="min-width:180px;" onchange="toggleBulkRoleSelect(this.value)">
+                            <option value="" disabled selected>Select Action...</option>
+                            <option value="bulk_suspend">Suspend Selected Users</option>
+                            <option value="bulk_activate">Re-Activate Selected Users</option>
+                            <option value="bulk_change_role">Change Role for Selected</option>
+                            <option value="bulk_revoke_sessions">Revoke Active Sessions</option>
+                        </select>
+
+                        <select id="bulkRoleSelect" name="bulk_role" class="form-select select-compact" style="min-width:140px;display:none;">
+                            <option value="analyst">Role: Analyst</option>
+                            <option value="user">Role: User</option>
+                            <option value="admin">Role: Admin</option>
+                        </select>
+
+                        <button type="submit" class="btn btn-action btn-primary" onclick="return confirmBulkAction()">Apply to Selected</button>
+                    </form>
+
+                    <table class="data-table" id="usersTable">
+                        <caption>System registered users, multi-select operations, and individual modifications</caption>
+                        <thead>
+                            <tr>
+                                <th scope="col" style="width:36px;text-align:center;">
+                                    <input type="checkbox" id="selectAllUsers" title="Select All Users" onclick="toggleSelectAllUsers(this)">
+                                </th>
+                                <th scope="col">User ID</th>
+                                <th scope="col">Username</th>
+                                <th scope="col">Email Address</th>
+                                <th scope="col">Role</th>
+                                <th scope="col">Status</th>
+                                <th scope="col">2FA</th>
+                                <th scope="col">Last Login</th>
+                                <th scope="col">Joined</th>
+                                <th scope="col">Action Controls</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for u in users %}
+                            <tr>
+                                <td style="text-align:center;">
+                                    {% if u.id != current_user.id %}
+                                    <input type="checkbox" form="bulkUserForm" name="selected_user_ids" value="{{ u.id }}" class="user-select-checkbox" onchange="updateSelectedCount()">
+                                    {% else %}
+                                    <span title="Self actions disabled" style="color:#64748b;">—</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ u.id }}</td>
+                                <td><strong>{{ u.username }}</strong></td>
+                                <td>{{ u.email }}</td>
+                                <td>{{ u.role | capitalize }}</td>
+                                <td>
+                                    {% if u.is_locked %}
+                                    <span class="badge badge-critical" title="Account locked due to failed login attempts">Locked</span>
+                                    {% elif u.is_active %}
+                                    <span class="badge badge-success">Active</span>
+                                    {% else %}
+                                    <span class="badge badge-warning">Suspended</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if u.mfa_enabled %}
+                                    <span class="badge badge-success" title="2FA TOTP Active">TOTP</span>
+                                    {% else %}
+                                    <span style="color:#64748b;">Off</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if u.last_login %}
+                                    {{ u.last_login.strftime('%Y-%m-%d %H:%M') }}
+                                    {% if u.last_login_ip %}<br><small style="color:#64748b;">({{ u.last_login_ip }})</small>{% endif %}
+                                    {% else %}
+                                    <span style="color:#64748b;">Never</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ u.created_at.strftime('%Y-%m-%d') if u.created_at else '—' }}</td>
+                                <td>
+                                    {% if u.id != current_user.id %}
+                                    <form action="{{ url_for('admin.admin') }}" method="POST" class="inline-action-form">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <input type="hidden" name="user_id" value="{{ u.id }}">
+                                        <select name="new_role" class="form-select select-compact">
+                                            <option value="admin" {% if u.role == 'admin' %}selected{% endif %}>Admin</option>
+                                            <option value="analyst" {% if u.role == 'analyst' %}selected{% endif %}>Analyst</option>
+                                            <option value="user" {% if u.role == 'user' %}selected{% endif %}>User</option>
+                                        </select>
+                                        <button type="submit" name="action" value="update_role" class="btn btn-action btn-secondary">Apply</button>
+                                        {% if u.is_locked %}
+                                        <button type="submit" name="action" value="unlock_user" class="btn btn-action btn-success"
+                                            title="Manually unlock this user account">Unlock</button>
+                                        {% endif %}
+                                        {% if u.is_active %}
+                                        <button type="submit" name="action" value="suspend" class="btn btn-action btn-warning">Suspend</button>
+                                        {% else %}
+                                        <button type="submit" name="action" value="activate" class="btn btn-action btn-success">Re-Activate</button>
+                                        {% endif %}
+                                        {% if u.mfa_enabled %}
+                                        <button type="submit" name="action" value="reset_mfa" class="btn btn-action btn-warning"
+                                            title="Reset and disable 2FA for this user"
+                                            onclick="return confirm('Reset and disable 2FA for {{ u.username }}?')">Reset 2FA</button>
+                                        {% endif %}
+                                        <button type="submit" name="action" value="revoke_sessions" class="btn btn-action btn-secondary"
+                                            title="Terminate all active browser sessions"
+                                            onclick="return confirm('Revoke all active sessions for {{ u.username }}?')">Revoke Session</button>
+                                        <button type="submit" name="action" value="reset_password" class="btn btn-action btn-secondary"
+                                            onclick="return confirm('Reset password for {{ u.username }} to a temporary secure password?')">Reset PWD</button>
+                                        <button type="submit" name="action" value="generate_reset_token" class="btn btn-action btn-secondary"
+                                            title="Generate a one-time password reset link for this user">Reset Link</button>
+                                        <button type="submit" name="action" value="delete" class="btn btn-action btn-danger"
+                                            onclick="return confirm('Delete {{ u.username }}? This cannot be undone.')">Delete</button>
+                                    </form>
+                                    {% else %}
+                                    <span style="color:#888;font-size:0.85em;">Current session</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="10" style="text-align:center;color:#888;">No users found.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </section>
+
+                <hr class="section-divider">
+
+                <div class="admin-grid-layout">
+                    
+                    <!-- Provision User Form -->
+                    <article class="admin-card-inner">
+                        <header class="card-header">
+                            <h3 class="card-title">Provision New Analyst Profile</h3>
+                        </header>
+                        <form action="{{ url_for('admin.admin') }}" method="POST" class="admin-inner-form">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="action" value="provision">
+                            <div class="form-group">
+                                <label for="new-username" class="form-label">Username</label>
+                                <input type="text" id="new-username" name="username" class="form-input" placeholder="e.g. jsmith" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="new-email" class="form-label">Email Address</label>
+                                <input type="email" id="new-email" name="email" class="form-input" placeholder="jsmith@org.com" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="new-password" class="form-label">Initial Password</label>
+                                <input type="password" id="new-password" name="password" class="form-input" placeholder="Min 8 characters" required minlength="8">
+                            </div>
+                            <div class="form-group">
+                                <label for="new-role-select" class="form-label">Security Role</label>
+                                <select id="new-role-select" name="role" class="form-select" required>
+                                    <option value="" disabled selected>Select permission level...</option>
+                                    <option value="admin">Global Administrator</option>
+                                    <option value="analyst">Threat Analyst</option>
+                                    <option value="user">Read-Only User</option>
+                                </select>
+                            </div>
+                            <div class="form-actions">
+                                <button type="submit" class="btn btn-primary btn-submit">Create Account</button>
+                            </div>
+                        </form>
+                    </article>
+
+                    <!-- API Integration Config -->
+                    <article class="admin-card-inner">
+                        <header class="card-header">
+                            <h3 class="card-title">Threat Intel API Feed Integration</h3>
+                        </header>
+                        <p style="color:#aaa;font-size:0.9em;margin-bottom:1rem;">
+                            API keys are configured via environment variables for security. 
+                            Set <code>VIRUSTOTAL_API_KEY</code>, <code>OTX_API_KEY</code>, 
+                            <code>ABUSEIPDB_API_KEY</code>, and <code>SIEM_WEBHOOK_API_KEY</code> 
+                            in your <code>.env</code> file.
+                        </p>
+                        <dl style="font-size:0.85em;color:#ccc;">
+                            <dt>VIRUSTOTAL_API_KEY</dt>
+                            <dd style="color:{{ 'limegreen' if config.get('VIRUSTOTAL_API_KEY') else '#f87171' }}">
+                                {{ '✓ Configured' if config.get('VIRUSTOTAL_API_KEY') else '✗ Not set' }}
+                            </dd>
+                            <dt>OTX_API_KEY</dt>
+                            <dd style="color:{{ 'limegreen' if config.get('OTX_API_KEY') else '#f87171' }}">
+                                {{ '✓ Configured' if config.get('OTX_API_KEY') else '✗ Not set' }}
+                            </dd>
+                            <dt>ABUSEIPDB_API_KEY</dt>
+                            <dd style="color:{{ 'limegreen' if config.get('ABUSEIPDB_API_KEY') else '#f87171' }}">
+                                {{ '✓ Configured' if config.get('ABUSEIPDB_API_KEY') else '✗ Not set' }}
+                            </dd>
+                            <dt>SIEM_WEBHOOK_API_KEY</dt>
+                            <dd style="color:{{ 'limegreen' if config.get('SIEM_WEBHOOK_API_KEY') and config.get('SIEM_WEBHOOK_API_KEY') != 'tip-siem-edr-default-secret-key-2026' else '#f87171' }}">
+                                {{ '✓ Configured' if config.get('SIEM_WEBHOOK_API_KEY') and config.get('SIEM_WEBHOOK_API_KEY') != 'tip-siem-edr-default-secret-key-2026' else '✗ Default / Not set' }}
+                            </dd>
+                        </dl>
+                    </article>
+
+                </div>
+
+                <hr class="section-divider">
+
+                <!-- ══════════════════════════════════════════════════════════ -->
+                <!-- G-5 & G-7: Platform Administrative Audit Trail             -->
+                <!-- ══════════════════════════════════════════════════════════ -->
+                <section class="admin-subsection" aria-labelledby="audit-heading">
+                    <header class="subsection-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;">
+                        <div>
+                            <h2 id="audit-heading" class="subsection-title">Platform Administrative Audit Trail</h2>
+                            {% if audit_pagination %}
+                            <p class="page-subtitle" style="margin-top:0.25rem;">
+                                Showing {{ audit_logs | length }} of {{ audit_pagination.total_count }} total entries (Page {{ audit_pagination.page }} of {{ audit_pagination.total_pages }})
+                            </p>
+                            {% endif %}
+                        </div>
+                        <div>
+                            <!-- G-7: 1-Click CSV Export Button -->
+                            <a href="{{ url_for('admin.export_audit_logs_csv', q=audit_pagination.filters.q if audit_pagination else '', user_id=audit_pagination.filters.user_id if audit_pagination else '', action_filter=audit_pagination.filters.action if audit_pagination else '', target_table=audit_pagination.filters.target_table if audit_pagination else '', date_from=audit_pagination.filters.date_from if audit_pagination else '', date_to=audit_pagination.filters.date_to if audit_pagination else '') }}"
+                               class="btn btn-action btn-success" style="text-decoration:none;display:inline-flex;align-items:center;gap:0.4rem;"
+                               title="Download compliance audit trail as CSV (G-7)">
+                                📥 Export to CSV
+                            </a>
+                        </div>
+                    </header>
+
+                    <!-- G-5: Audit Log Search & Filter Controls -->
+                    <form method="GET" action="{{ url_for('admin.admin') }}" class="audit-filter-form"
+                          style="background:var(--bg-secondary, #1e293b);padding:1rem;border-radius:6px;border:1px solid var(--border-color, #334155);margin-bottom:1.25rem;">
+                        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(160px, 1fr));gap:0.75rem;align-items:flex-end;">
+                            <div class="form-group" style="margin-bottom:0;">
+                                <label for="audit-q" class="form-label" style="font-size:0.8rem;margin-bottom:0.25rem;">Search Keyword</label>
+                                <input type="text" id="audit-q" name="q" value="{{ audit_pagination.filters.q if audit_pagination else '' }}"
+                                       class="form-input" placeholder="Action, IP, user..." style="padding:0.4rem 0.6rem;font-size:0.85rem;">
+                            </div>
+                            <div class="form-group" style="margin-bottom:0;">
+                                <label for="audit-user" class="form-label" style="font-size:0.8rem;margin-bottom:0.25rem;">Actor User</label>
+                                <select id="audit-user" name="user_id" class="form-select select-compact" style="width:100%;">
+                                    <option value="">All Users</option>
+                                    {% for u in users %}
+                                    <option value="{{ u.id }}" {% if audit_pagination and audit_pagination.filters.user_id == u.id %}selected{% endif %}>{{ u.username }} (ID {{ u.id }})</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="form-group" style="margin-bottom:0;">
+                                <label for="audit-table" class="form-label" style="font-size:0.8rem;margin-bottom:0.25rem;">Target Table</label>
+                                <select id="audit-table" name="target_table" class="form-select select-compact" style="width:100%;">
+                                    <option value="">All Tables</option>
+                                    {% for tbl in audit_tables %}
+                                    <option value="{{ tbl }}" {% if audit_pagination and audit_pagination.filters.target_table == tbl %}selected{% endif %}>{{ tbl }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="form-group" style="margin-bottom:0;">
+                                <label for="audit-action" class="form-label" style="font-size:0.8rem;margin-bottom:0.25rem;">Action Filter</label>
+                                <input type="text" id="audit-action" name="action_filter" value="{{ audit_pagination.filters.action if audit_pagination else '' }}"
+                                       class="form-input" placeholder="e.g. suspend, login" style="padding:0.4rem 0.6rem;font-size:0.85rem;">
+                            </div>
+                            <div class="form-group" style="margin-bottom:0;">
+                                <label for="audit-from" class="form-label" style="font-size:0.8rem;margin-bottom:0.25rem;">Date From</label>
+                                <input type="date" id="audit-from" name="date_from" value="{{ audit_pagination.filters.date_from if audit_pagination else '' }}"
+                                       class="form-input" style="padding:0.4rem 0.6rem;font-size:0.85rem;">
+                            </div>
+                            <div class="form-group" style="margin-bottom:0;">
+                                <label for="audit-to" class="form-label" style="font-size:0.8rem;margin-bottom:0.25rem;">Date To</label>
+                                <input type="date" id="audit-to" name="date_to" value="{{ audit_pagination.filters.date_to if audit_pagination else '' }}"
+                                       class="form-input" style="padding:0.4rem 0.6rem;font-size:0.85rem;">
+                            </div>
+                            <div style="display:flex;gap:0.5rem;">
+                                <button type="submit" class="btn btn-action btn-primary" style="flex:1;">Filter</button>
+                                <a href="{{ url_for('admin.admin') }}" class="btn btn-action btn-secondary" style="text-decoration:none;display:flex;align-items:center;justify-content:center;">Reset</a>
+                            </div>
+                        </div>
+                    </form>
+
+                    <table class="data-table">
+                        <caption>Audit log registry for tracking administrative modifications</caption>
+                        <thead>
+                            <tr>
+                                <th scope="col">Log Timestamp</th>
+                                <th scope="col">Actor (User ID)</th>
+                                <th scope="col">Action</th>
+                                <th scope="col">Target Table</th>
+                                <th scope="col">Target ID</th>
+                                <th scope="col">IP Address</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for log in audit_logs %}
+                            <tr>
+                                <td>{{ log.created_at.strftime('%Y-%m-%d %H:%M:%S') if log.created_at else '—' }}</td>
+                                <td>
+                                    <strong>{{ log.user.username if log.user else 'System' }}</strong>
+                                    <small style="color:#64748b;">(ID: {{ log.user_id }})</small>
+                                </td>
+                                <td><code>{{ log.action }}</code></td>
+                                <td><span class="badge badge-secondary">{{ log.target_table }}</span></td>
+                                <td>{{ log.target_id if log.target_id is not none else '—' }}</td>
+                                <td>{{ log.ip_address or '—' }}</td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="6" style="text-align:center;color:#888;">No audit log entries matching criteria.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+
+                    <!-- G-5: Pagination Controls -->
+                    {% if audit_pagination and audit_pagination.total_pages > 1 %}
+                    <nav class="pagination-bar" aria-label="Audit Log Pagination"
+                         style="display:flex;justify-content:space-between;align-items:center;margin-top:1rem;flex-wrap:wrap;gap:0.5rem;">
+                        <div style="font-size:0.85rem;color:#94a3b8;">
+                            Page {{ audit_pagination.page }} of {{ audit_pagination.total_pages }} ({{ audit_pagination.total_count }} total entries)
+                        </div>
+                        <ul class="pagination-links" style="display:flex;list-style:none;gap:0.4rem;margin:0;padding:0;">
+                            {% if audit_pagination.has_prev %}
+                            <li>
+                                <a href="{{ url_for('admin.admin', page=audit_pagination.prev_num, q=audit_pagination.filters.q, user_id=audit_pagination.filters.user_id, action_filter=audit_pagination.filters.action, target_table=audit_pagination.filters.target_table, date_from=audit_pagination.filters.date_from, date_to=audit_pagination.filters.date_to) }}"
+                                   class="btn btn-action btn-secondary" style="text-decoration:none;">&larr; Previous</a>
+                            </li>
+                            {% endif %}
+                            
+                            {% if audit_pagination.has_next %}
+                            <li>
+                                <a href="{{ url_for('admin.admin', page=audit_pagination.next_num, q=audit_pagination.filters.q, user_id=audit_pagination.filters.user_id, action_filter=audit_pagination.filters.action, target_table=audit_pagination.filters.target_table, date_from=audit_pagination.filters.date_from, date_to=audit_pagination.filters.date_to) }}"
+                                   class="btn btn-action btn-secondary" style="text-decoration:none;">Next &rarr;</a>
+                            </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                    {% endif %}
+                </section>
+
+            </section>
+
+        </main>
+    </div>
+
+    <!-- Global Platform Footer -->
+    <footer class="main-footer">
+        <div class="footer-content">
+            <p class="copyright-text">&copy; 2026 Threat Intelligence Platform. All Rights Reserved. Securing Assets Globally.</p>
+            <nav class="footer-links" aria-label="Legal Links">
+                <a href="#" class="footer-link">Privacy Policy</a>
+                <span class="separator">|</span>
+                <a href="#" class="footer-link">Terms of Service</a>
+                <span class="separator">|</span>
+                <a href="{{ url_for('admin.admin') }}" class="footer-link">Security Audit Logs</a>
+            </nav>
+        </div>
+    </footer>
+
+    <!-- Interactive Bulk Actions & Multi-Select Script (G-10) -->
+    <script>
+        function toggleSelectAllUsers(master) {
+            const checkboxes = document.querySelectorAll('.user-select-checkbox');
+            checkboxes.forEach(cb => {
+                cb.checked = master.checked;
+            });
+            updateSelectedCount();
+        }
+
+        function updateSelectedCount() {
+            const selected = document.querySelectorAll('.user-select-checkbox:checked').length;
+            const countElem = document.getElementById('selectedUsersCount');
+            if (countElem) {
+                countElem.textContent = selected;
+            }
+        }
+
+        function toggleBulkRoleSelect(actionValue) {
+            const roleSelect = document.getElementById('bulkRoleSelect');
+            if (roleSelect) {
+                roleSelect.style.display = (actionValue === 'bulk_change_role') ? 'inline-block' : 'none';
+            }
+        }
+
+        function confirmBulkAction() {
+            const bulkSelect = document.getElementById('bulkTypeSelect');
+            const action = bulkSelect ? bulkSelect.value : '';
+            const selected = document.querySelectorAll('.user-select-checkbox:checked').length;
+            if (selected === 0) {
+                alert('Please select at least one user by checking the box next to their name.');
+                return false;
+            }
+            if (!action) {
+                alert('Please select a bulk action from the dropdown.');
+                return false;
+            }
+            const actionNames = {
+                'bulk_suspend': 'SUSPEND',
+                'bulk_activate': 'RE-ACTIVATE',
+                'bulk_change_role': 'CHANGE ROLE FOR',
+                'bulk_revoke_sessions': 'REVOKE ALL ACTIVE SESSIONS FOR'
+            };
+            const label = actionNames[action] || action;
+            return confirm(`Are you sure you want to ${label} ${selected} selected user(s)?`);
+        }
+    </script>
+
+</body>
+</html>

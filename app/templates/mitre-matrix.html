@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <meta name="description" content="Enterprise MITRE ATT&CK Matrix & Threat Heatmap. Correlate adversarial Tactics, Techniques, and Procedures across active malware, reports, and EDR alerts.">
+    <title>MITRE ATT&CK Matrix - Threat Intelligence Platform</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="{{ url_for('static', filename='js/1-funtioning.js') }}" defer></script>
+</head>
+<body class="dashboard-page">
+
+    <!-- Top Navigation Header -->
+    <header class="main-header">
+        <nav class="navbar dashboard-navbar" aria-label="Main Navigation">
+            <div class="navbar-brand">
+                <a href="{{ url_for('main.home') }}" class="logo-link">
+                    <span class="logo-icon">&#128737;</span>
+                    <span class="logo-text">ThreatIntel Platform</span>
+                </a>
+            </div>
+
+            <!-- Global Quick Search -->
+            <div class="navbar-search">
+                <form action="{{ url_for('dashboard.search_threats') }}" method="GET" class="search-form">
+                    <label for="global-search" class="visually-hidden">Search threats, IPs, hashes</label>
+                    <input type="search" id="global-search" name="query" class="search-input" placeholder="Search threats, IPs, CVEs...">
+                    <button type="submit" class="search-button">Search</button>
+                </form>
+            </div>
+
+            <div class="navbar-user-menu">
+                <span class="user-role badge-critical">{{ current_user.role|capitalize if current_user.is_authenticated else 'Analyst' }}</span>
+                <a href="{{ url_for('dashboard.profile') }}" class="user-profile-link">Profile Settings</a>
+                <a href="{{ url_for('auth.logout') }}" class="logout-link">Sign Out</a>
+            </div>
+        </nav>
+    </header>
+
+    <div class="layout-container">
+        
+        <!-- Left Sidebar Navigation -->
+        <aside class="sidebar" aria-label="Sidebar Navigation">
+            <nav class="sidebar-navigation">
+                <ul class="sidebar-menu">
+                    <li><a href="{{ url_for('dashboard.dashboard') }}" class="menu-item">Dashboard Overview</a></li>
+                    <li><a href="{{ url_for('dashboard.threat_feed') }}" class="menu-item">Live Threat Feed</a></li>
+                    <li><a href="{{ url_for('dashboard.threat_news') }}" class="menu-item">Threat News</a></li>
+                    <li><a href="{{ url_for('dashboard.ip_checker') }}" class="menu-item">IP Address Checker</a></li>
+                    <li><a href="{{ url_for('dashboard.malware_info') }}" class="menu-item">Malware Information</a></li>
+                    <li><a href="{{ url_for('dashboard.mitre_matrix') }}" class="menu-item active-menu-item">MITRE ATT&amp;CK Matrix</a></li>
+                    <li><a href="{{ url_for('dashboard.threat_report_upload') }}" class="menu-item">Upload Threat Report</a></li>
+                    <li><a href="{{ url_for('dashboard.search_threats') }}" class="menu-item">Search Threats Database</a></li>
+                    <li><a href="{{ url_for('dashboard.alerts') }}" class="menu-item">Alerts & Notifications</a></li>
+                    <li><a href="{{ url_for('dashboard.siem_edr_integration') }}" class="menu-item">SIEM / EDR Integration</a></li>
+                    <li><a href="{{ url_for('admin.admin') }}" class="menu-item">System Admin Panel</a></li>
+                </ul>
+            </nav>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="dashboard-main-content">
+            
+            <section class="integration-section" aria-labelledby="mitre-heading">
+                <header class="section-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+                    <div>
+                        <h1 id="mitre-heading" class="page-title" style="display: flex; align-items: center; gap: 0.5rem;">
+                            <span style="color: #ef4444;">&#128737;</span> Enterprise MITRE ATT&amp;CK&reg; Matrix &amp; Threat Heatmap
+                        </h1>
+                        <p class="page-subtitle">Tactics, Techniques, and Procedures (TTPs) framework correlated against active malware families, reports, and EDR detections</p>
+                    </div>
+                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                        <a href="/api/v1/mitre/navigator?download=true" class="btn btn-primary btn-sm" style="text-decoration: none; display: flex; align-items: center; gap: 0.35rem;">
+                            <span>&#128229;</span> Export ATT&amp;CK Navigator Layer (.json)
+                        </a>
+                        <button type="button" id="btn-open-extractor" class="btn btn-secondary btn-sm" style="display: flex; align-items: center; gap: 0.35rem;">
+                            <span>&#128269;</span> TTP Extractor Sandbox
+                        </button>
+                    </div>
+                </header>
+
+                <!-- Metric Summary Cards -->
+                <div class="metrics-grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));">
+                    <article class="metric-card">
+                        <div class="metric-icon-wrap" style="color: #38bdf8;">&#128202;</div>
+                        <div class="metric-data">
+                            <span class="metric-label">Kill Chain Tactics</span>
+                            <span class="metric-value">{{ summary.total_tactics }}</span>
+                            <span class="metric-delta delta-positive">Recon &rarr; Impact</span>
+                        </div>
+                    </article>
+
+                    <article class="metric-card">
+                        <div class="metric-icon-wrap" style="color: #f59e0b;">&#127919;</div>
+                        <div class="metric-data">
+                            <span class="metric-label">Unique Observed TTPs</span>
+                            <span class="metric-value">{{ summary.unique_techniques_observed }}</span>
+                            <span class="metric-delta delta-positive">In Current Database</span>
+                        </div>
+                    </article>
+
+                    <article class="metric-card">
+                        <div class="metric-icon-wrap" style="color: #ef4444;">&#9888;</div>
+                        <div class="metric-data">
+                            <span class="metric-label">Total Threat Mappings</span>
+                            <span class="metric-value">{{ summary.total_threat_occurrences }}</span>
+                            <span class="metric-delta delta-positive">Across Malware &amp; Alerts</span>
+                        </div>
+                    </article>
+
+                    <article class="metric-card">
+                        <div class="metric-icon-wrap" style="color: #10b981;">&#128737;</div>
+                        <div class="metric-data">
+                            <span class="metric-label">Enterprise Coverage</span>
+                            <span class="metric-value">{{ summary.coverage_percentage }}%</span>
+                            <span class="metric-delta delta-positive">{{ summary.active_tactics }} / {{ summary.total_tactics }} Active Tactics</span>
+                        </div>
+                    </article>
+
+                    <article class="metric-card">
+                        <div class="metric-icon-wrap" style="color: #a855f7;">&#128293;</div>
+                        <div class="metric-data">
+                            <span class="metric-label">Top Observed Tactic</span>
+                            <span class="metric-value" style="font-size: 1.1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ summary.top_tactic }}</span>
+                            <span class="metric-delta delta-positive">Highest Density</span>
+                        </div>
+                    </article>
+                </div>
+
+                <!-- TTP Extractor Sandbox (Collapsible) -->
+                <div id="extractor-sandbox-panel" style="display: none; margin-top: 1.25rem; background: #0f172a; border: 1px solid #1e293b; border-radius: 6px; padding: 1.25rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                        <h3 style="margin: 0; color: #38bdf8; font-size: 1rem;">&#128269; Live MITRE ATT&amp;CK TTP Extraction Sandbox</h3>
+                        <button type="button" id="btn-close-extractor" class="btn btn-secondary btn-sm" style="padding: 0.2rem 0.5rem; font-size: 0.8rem;">&times; Close</button>
+                    </div>
+                    <p style="color: #94a3b8; font-size: 0.85rem; margin-bottom: 0.75rem;">Paste raw incident logs, EDR command lines, or threat report narratives to automatically extract and map MITRE techniques:</p>
+                    <textarea id="sandbox-input-text" class="form-input" rows="3" placeholder="e.g. Adversary executed powershell.exe -enc ... (T1059.001) and used Mimikatz (T1003.001) for LSASS memory injection (T1055)." style="font-family: monospace; font-size: 0.85rem; width: 100%;"></textarea>
+                    <div style="display: flex; gap: 0.5rem; margin-top: 0.75rem;">
+                        <button type="button" id="btn-run-extract" class="btn btn-primary btn-sm">&#9654; Extract &amp; Map Techniques</button>
+                    </div>
+                    <div id="sandbox-results-area" style="display: none; margin-top: 1rem; padding: 0.75rem; background: #020617; border-radius: 4px; border: 1px solid #1e293b;">
+                        <h4 style="font-size: 0.85rem; color: #10b981; margin: 0 0 0.5rem 0;">Extracted Techniques:</h4>
+                        <div id="sandbox-techniques-pills" style="display: flex; flex-wrap: wrap; gap: 0.5rem;"></div>
+                    </div>
+                </div>
+
+                <!-- Interactive Matrix Filter Toolbar -->
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-top: 1.5rem; background: #090d16; padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid #1e293b;">
+                    <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; flex: 1;">
+                        <div style="position: relative; min-width: 250px; flex: 1;">
+                            <input type="text" id="matrix-search-input" class="form-input" placeholder="Search TTP by ID or name (e.g. T1059, PowerShell)..." style="font-size: 0.85rem; padding: 0.4rem 0.6rem;">
+                        </div>
+                        <select id="matrix-tactic-filter" class="form-select" style="font-size: 0.85rem; max-width: 220px;">
+                            <option value="all" selected>All 14 Tactics (Full Kill Chain)</option>
+                            {% for tac in tactics %}
+                            <option value="{{ tac.id }}">{{ tac.order }}. {{ tac.name }} ({{ tac.id }})</option>
+                            {% endfor %}
+                        </select>
+                        <select id="matrix-severity-filter" class="form-select" style="font-size: 0.85rem; max-width: 170px;">
+                            <option value="all" selected>All Severities</option>
+                            <option value="Critical">Critical Threats</option>
+                            <option value="High">High Threats</option>
+                            <option value="Medium">Medium Threats</option>
+                        </select>
+                    </div>
+                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                        <span style="font-size: 0.75rem; color: #64748b;">Heatmap Legend:</span>
+                        <span class="badge" style="background: #ef4444; color: white; font-size: 0.7rem;">Critical</span>
+                        <span class="badge" style="background: #f59e0b; color: white; font-size: 0.7rem;">High</span>
+                        <span class="badge" style="background: #3b82f6; color: white; font-size: 0.7rem;">Medium</span>
+                        <span class="badge" style="background: #1e293b; color: #94a3b8; font-size: 0.7rem;">Catalog TTP</span>
+                    </div>
+                </div>
+
+                <!-- 14-Column MITRE Enterprise Matrix Heatmap -->
+                <div style="margin-top: 1rem; overflow-x: auto; padding-bottom: 1.5rem;">
+                    <div class="mitre-matrix-container" style="display: flex; gap: 0.75rem; min-width: 2500px; align-items: flex-start;">
+                        
+                        {% for tac in tactics %}
+                        <div class="mitre-column" data-tactic-id="{{ tac.id }}" style="flex: 1; min-width: 180px; background: #0f172a; border: 1px solid #1e293b; border-radius: 6px; overflow: hidden; display: flex; flex-direction: column;">
+                            
+                            <!-- Column Header -->
+                            <div class="mitre-col-header" style="background: #1e293b; padding: 0.6rem 0.5rem; border-bottom: 2px solid {% if tac.total_observed_count > 0 %}#ef4444{% else %}#334155{% endif %}; text-align: center;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
+                                    <span style="font-size: 0.65rem; color: #94a3b8; font-weight: 700;">#{{ tac.order }}</span>
+                                    <span style="font-size: 0.65rem; color: #64748b; font-family: monospace;">{{ tac.id }}</span>
+                                </div>
+                                <h3 style="font-size: 0.8rem; margin: 0; color: #f1f5f9; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="{{ tac.name }}">{{ tac.name }}</h3>
+                                <div style="margin-top: 0.35rem; display: flex; justify-content: center; gap: 0.25rem;">
+                                    {% if tac.total_observed_count > 0 %}
+                                    <span class="badge" style="background: #ef4444; color: white; font-size: 0.65rem; padding: 0.1rem 0.4rem;">{{ tac.total_observed_count }} Active</span>
+                                    {% else %}
+                                    <span class="badge" style="background: #1e293b; color: #64748b; font-size: 0.65rem; padding: 0.1rem 0.4rem;">0 Observed</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <!-- Column Techniques List -->
+                            <div class="mitre-col-body" style="padding: 0.5rem; display: flex; flex-direction: column; gap: 0.5rem; max-height: 650px; overflow-y: auto;">
+                                
+                                <!-- Active Observed Techniques in TIP -->
+                                {% for tech in tac.techniques_list %}
+                                <div class="mitre-technique-card active-technique"
+                                     data-tech-id="{{ tech.id }}"
+                                     data-tech-name="{{ tech.name }}"
+                                     data-severity="{{ tech.max_severity }}"
+                                     data-tactic-id="{{ tac.id }}"
+                                     style="background: #020617; border: 1px solid {% if tech.max_severity == 'Critical' %}#ef4444{% elif tech.max_severity == 'High' %}#f59e0b{% else %}#3b82f6{% endif %}; border-radius: 4px; padding: 0.5rem; cursor: pointer; transition: transform 0.15s, box-shadow 0.15s;">
+                                    
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.2rem;">
+                                        <code style="color: #38bdf8; font-size: 0.7rem; font-weight: 700;">{{ tech.id }}</code>
+                                        <span class="badge" style="background: {% if tech.max_severity == 'Critical' %}#ef4444{% elif tech.max_severity == 'High' %}#f59e0b{% else %}#3b82f6{% endif %}; color: white; font-size: 0.6rem; padding: 0.05rem 0.3rem;">
+                                            {{ tech.count }}
+                                        </span>
+                                    </div>
+                                    <div style="font-size: 0.75rem; color: #e2e8f0; font-weight: 500; line-height: 1.25; margin-bottom: 0.25rem;">
+                                        {{ tech.name }}
+                                    </div>
+                                    <div style="font-size: 0.65rem; color: #94a3b8;">
+                                        Sev: <strong style="color: {% if tech.max_severity == 'Critical' %}#ef4444{% elif tech.max_severity == 'High' %}#f59e0b{% else %}#38bdf8{% endif %};">{{ tech.max_severity }}</strong>
+                                    </div>
+                                </div>
+                                {% endfor %}
+
+                                <!-- Standard Catalog Techniques for this Tactic -->
+                                {% for c_id, c_tech in get_catalog_techniques_for_tactic(tac.id) %}
+                                    {% if not is_technique_in_list(c_id, tac.techniques_list) %}
+                                    <div class="mitre-technique-card catalog-technique"
+                                         data-tech-id="{{ c_tech.id }}"
+                                         data-tech-name="{{ c_tech.name }}"
+                                         data-severity="None"
+                                         data-tactic-id="{{ tac.id }}"
+                                         style="background: #0b1120; border: 1px solid #1e293b; border-radius: 4px; padding: 0.4rem; cursor: pointer; opacity: 0.75; transition: opacity 0.15s;">
+                                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.15rem;">
+                                            <code style="color: #64748b; font-size: 0.7rem;">{{ c_tech.id }}</code>
+                                        </div>
+                                        <div style="font-size: 0.7rem; color: #94a3b8; line-height: 1.2;">
+                                            {{ c_tech.name }}
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                {% endfor %}
+
+                            </div>
+
+                        </div>
+                        {% endfor %}
+
+                    </div>
+                </div>
+
+                <!-- Technique Inspector Modal -->
+                <div id="technique-modal" style="display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.75); z-index: 9999; display: none; align-items: center; justify-content: center; padding: 1rem;">
+                    <div style="background: #0f172a; border: 1px solid #334155; border-radius: 8px; width: 100%; max-width: 650px; max-height: 90vh; overflow-y: auto; padding: 1.5rem; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);">
+                        
+                        <!-- Modal Header -->
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem; border-bottom: 1px solid #1e293b; padding-bottom: 0.75rem;">
+                            <div>
+                                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                                    <span id="modal-tech-id" style="font-family: monospace; font-size: 1.1rem; color: #38bdf8; font-weight: 700;">T1059.001</span>
+                                    <a id="modal-external-link" href="#" target="_blank" class="btn btn-secondary btn-sm" style="font-size: 0.7rem; padding: 0.15rem 0.4rem; text-decoration: none;">View on MITRE ATT&amp;CK &nearr;</a>
+                                </div>
+                                <h2 id="modal-tech-name" style="margin: 0.35rem 0 0 0; color: #f1f5f9; font-size: 1.2rem;">Command and Scripting Interpreter: PowerShell</h2>
+                            </div>
+                            <button type="button" id="btn-close-modal" class="btn btn-secondary btn-sm" style="font-size: 1.2rem; line-height: 1; padding: 0.2rem 0.5rem;">&times;</button>
+                        </div>
+
+                        <!-- Modal Body Content -->
+                        <div style="display: flex; flex-direction: column; gap: 1rem; font-size: 0.85rem; color: #cbd5e1;">
+                            
+                            <!-- Platforms and Tactics Pills -->
+                            <div>
+                                <strong style="color: #94a3b8; display: block; margin-bottom: 0.25rem;">Tactics &amp; Platforms:</strong>
+                                <div id="modal-tactics-pills" style="display: flex; flex-wrap: wrap; gap: 0.35rem;"></div>
+                            </div>
+
+                            <!-- Description -->
+                            <div>
+                                <strong style="color: #94a3b8; display: block; margin-bottom: 0.25rem;">Technique Description:</strong>
+                                <p id="modal-tech-desc" style="margin: 0; line-height: 1.5; color: #e2e8f0; background: #020617; padding: 0.75rem; border-radius: 4px; border: 1px solid #1e293b;"></p>
+                            </div>
+
+                            <!-- Detection Guidance -->
+                            <div>
+                                <strong style="color: #38bdf8; display: block; margin-bottom: 0.25rem;">Detection Strategy:</strong>
+                                <p id="modal-tech-detection" style="margin: 0; line-height: 1.5; color: #cbd5e1; background: #020617; padding: 0.75rem; border-radius: 4px; border: 1px solid #1e293b;"></p>
+                            </div>
+
+                            <!-- Mitigations -->
+                            <div>
+                                <strong style="color: #10b981; display: block; margin-bottom: 0.25rem;">Recommended Defensive Mitigations:</strong>
+                                <ul id="modal-tech-mitigations" style="margin: 0; padding-left: 1.25rem; line-height: 1.6; color: #cbd5e1;"></ul>
+                            </div>
+
+                            <!-- Active Platform Mappings -->
+                            <div id="modal-threats-container" style="display: none; background: #1a1025; border: 1px solid #4a1d96; border-radius: 4px; padding: 0.75rem;">
+                                <strong style="color: #f43f5e; display: block; margin-bottom: 0.5rem;">&#9888; Mapped Threat Instances in TIP:</strong>
+                                <div id="modal-threats-list" style="display: flex; flex-direction: column; gap: 0.35rem;"></div>
+                            </div>
+
+                        </div>
+
+                        <!-- Modal Footer -->
+                        <div style="margin-top: 1.25rem; padding-top: 0.75rem; border-top: 1px solid #1e293b; display: flex; justify-content: flex-end;">
+                            <button type="button" id="btn-close-modal-bottom" class="btn btn-secondary btn-sm">Close Inspector</button>
+                        </div>
+                    </div>
+                </div>
+
+            </section>
+
+        </main>
+    </div>
+
+    <!-- Client Script for Interactive Matrix Filtering & Modal Inspector -->
+    <script>
+    document.addEventListener("DOMContentLoaded", function() {
+        
+        // 1. Live Matrix Search Filtering
+        const searchInput = document.getElementById("matrix-search-input");
+        const tacticFilter = document.getElementById("matrix-tactic-filter");
+        const severityFilter = document.getElementById("matrix-severity-filter");
+
+        function filterMatrix() {
+            const q = searchInput.value.trim().toLowerCase();
+            const selectedTactic = tacticFilter.value;
+            const selectedSev = severityFilter.value;
+
+            // Columns filter
+            document.querySelectorAll(".mitre-column").forEach(col => {
+                const colTactic = col.getAttribute("data-tactic-id");
+                if (selectedTactic !== "all" && colTactic !== selectedTactic) {
+                    col.style.display = "none";
+                } else {
+                    col.style.display = "flex";
+                }
+            });
+
+            // Technique cards filter
+            document.querySelectorAll(".mitre-technique-card").forEach(card => {
+                const tid = (card.getAttribute("data-tech-id") || "").toLowerCase();
+                const tname = (card.getAttribute("data-tech-name") || "").toLowerCase();
+                const tsev = card.getAttribute("data-severity");
+
+                const matchesQuery = !q || tid.includes(q) || tname.includes(q);
+                const matchesSev = selectedSev === "all" || tsev === selectedSev;
+
+                if (matchesQuery && matchesSev) {
+                    card.style.display = "block";
+                } else {
+                    card.style.display = "none";
+                }
+            });
+        }
+
+        searchInput.addEventListener("input", filterMatrix);
+        tacticFilter.addEventListener("change", filterMatrix);
+        severityFilter.addEventListener("change", filterMatrix);
+
+        // 2. Technique Inspector Modal
+        const modal = document.getElementById("technique-modal");
+        const btnCloseModal = document.getElementById("btn-close-modal");
+        const btnCloseModalBottom = document.getElementById("btn-close-modal-bottom");
+
+        function closeModal() {
+            modal.style.display = "none";
+        }
+
+        if (btnCloseModal) btnCloseModal.addEventListener("click", closeModal);
+        if (btnCloseModalBottom) btnCloseModalBottom.addEventListener("click", closeModal);
+        window.addEventListener("click", function(e) {
+            if (e.target === modal) closeModal();
+        });
+
+        // Click on technique card to open inspector
+        document.querySelectorAll(".mitre-technique-card").forEach(card => {
+            card.addEventListener("click", async function() {
+                const techId = this.getAttribute("data-tech-id");
+                if (!techId) return;
+
+                try {
+                    const resp = await fetch("/api/v1/mitre/technique/" + encodeURIComponent(techId));
+                    if (!resp.ok) return;
+                    const resJson = await resp.json();
+                    const tech = resJson.technique;
+
+                    document.getElementById("modal-tech-id").textContent = tech.id;
+                    document.getElementById("modal-tech-name").textContent = tech.name;
+                    document.getElementById("modal-external-link").href = tech.url;
+                    document.getElementById("modal-tech-desc").textContent = tech.description || "No description available.";
+                    document.getElementById("modal-tech-detection").textContent = tech.detection || "Monitor process creation, system event logs, and network connection events.";
+
+                    // Tactics and platforms
+                    const tacticsPills = document.getElementById("modal-tactics-pills");
+                    tacticsPills.innerHTML = "";
+                    (tech.tactics_details || []).forEach(t => {
+                        const s = document.createElement("span");
+                        s.className = "badge";
+                        s.style.background = "#3b82f6";
+                        s.style.color = "white";
+                        s.textContent = `${t.name} (${t.id})`;
+                        tacticsPills.appendChild(s);
+                    });
+                    (tech.platforms || []).forEach(p => {
+                        const s = document.createElement("span");
+                        s.className = "badge";
+                        s.style.background = "#1e293b";
+                        s.style.color = "#cbd5e1";
+                        s.textContent = p;
+                        tacticsPills.appendChild(s);
+                    });
+
+                    // Mitigations
+                    const mitigationsUl = document.getElementById("modal-tech-mitigations");
+                    mitigationsUl.innerHTML = "";
+                    if (tech.mitigations && tech.mitigations.length > 0) {
+                        tech.mitigations.forEach(m => {
+                            const li = document.createElement("li");
+                            li.textContent = m;
+                            mitigationsUl.appendChild(li);
+                        });
+                    } else {
+                        const li = document.createElement("li");
+                        li.textContent = "M1040: Endpoint Detection and Response behavioral monitoring.";
+                        mitigationsUl.appendChild(li);
+                    }
+
+                    // Check if this technique is active in TIP
+                    const threatsBox = document.getElementById("modal-threats-container");
+                    const threatsList = document.getElementById("modal-threats-list");
+                    threatsList.innerHTML = "";
+
+                    // Query coverage to see if entities map
+                    try {
+                        const covResp = await fetch("/api/v1/mitre/coverage");
+                        const covData = await covResp.json();
+                        let foundEntities = [];
+                        (covData.tactics || []).forEach(tac => {
+                            (tac.techniques_list || []).forEach(t => {
+                                if (t.id === tech.id && t.entities) {
+                                    foundEntities = foundEntities.concat(t.entities);
+                                }
+                            });
+                        });
+
+                        if (foundEntities.length > 0) {
+                            threatsBox.style.display = "block";
+                            foundEntities.forEach(ent => {
+                                const row = document.createElement("div");
+                                row.style.display = "flex";
+                                row.style.justifyContent = "space-between";
+                                row.style.fontSize = "0.75rem";
+                                const link = ent.type === "Malware" ? `/malware/${ent.id}` : `/alert/${ent.id}`;
+                                row.innerHTML = `<span><strong>${ent.type}:</strong> <a href="${link}" style="color: #38bdf8; text-decoration: underline;">${ent.name}</a></span> <span class="badge" style="background: #ef4444; color: white;">${ent.severity || 'High'}</span>`;
+                                threatsList.appendChild(row);
+                            });
+                        } else {
+                            threatsBox.style.display = "none";
+                        }
+                    } catch(e) {
+                        threatsBox.style.display = "none";
+                    }
+
+                    modal.style.display = "flex";
+
+                } catch(err) {
+                    console.error("Error opening technique inspector:", err);
+                }
+            });
+        });
+
+        // 3. Extractor Sandbox Toggle & Handler
+        const btnOpenExtractor = document.getElementById("btn-open-extractor");
+        const btnCloseExtractor = document.getElementById("btn-close-extractor");
+        const sandboxPanel = document.getElementById("extractor-sandbox-panel");
+        const btnRunExtract = document.getElementById("btn-run-extract");
+
+        if (btnOpenExtractor && sandboxPanel) {
+            btnOpenExtractor.addEventListener("click", function() {
+                sandboxPanel.style.display = sandboxPanel.style.display === "none" ? "block" : "none";
+            });
+        }
+        if (btnCloseExtractor && sandboxPanel) {
+            btnCloseExtractor.addEventListener("click", function() {
+                sandboxPanel.style.display = "none";
+            });
+        }
+
+        if (btnRunExtract) {
+            btnRunExtract.addEventListener("click", async function() {
+                const txt = document.getElementById("sandbox-input-text").value.trim();
+                if (!txt) {
+                    alert("Please enter text or logs to extract MITRE techniques from.");
+                    return;
+                }
+
+                btnRunExtract.disabled = true;
+                btnRunExtract.textContent = "Analyzing TTPs...";
+
+                try {
+                    const resp = await fetch("/api/v1/mitre/extract", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ text: txt })
+                    });
+                    const data = await resp.json();
+
+                    const resultsArea = document.getElementById("sandbox-results-area");
+                    const pillsDiv = document.getElementById("sandbox-techniques-pills");
+                    pillsDiv.innerHTML = "";
+
+                    if (data.techniques && data.techniques.length > 0) {
+                        resultsArea.style.display = "block";
+                        data.techniques.forEach(t => {
+                            const btn = document.createElement("button");
+                            btn.type = "button";
+                            btn.className = "btn btn-secondary btn-sm";
+                            btn.style.fontSize = "0.75rem";
+                            btn.innerHTML = `<strong style="color: #38bdf8;">${t.id}</strong>: ${t.name}`;
+                            btn.addEventListener("click", function() {
+                                // Trigger modal inspector
+                                const card = document.querySelector(`.mitre-technique-card[data-tech-id="${t.id}"]`);
+                                if (card) card.click();
+                            });
+                            pillsDiv.appendChild(btn);
+                        });
+                    } else {
+                        resultsArea.style.display = "block";
+                        pillsDiv.innerHTML = "<span style='color: #94a3b8;'>No recognized MITRE ATT&CK technique IDs found in the input.</span>";
+                    }
+                } catch(err) {
+                    alert("Extraction failed: " + err);
+                } finally {
+                    btnRunExtract.disabled = false;
+                    btnRunExtract.textContent = "\u25B6 Extract & Map Techniques";
+                }
+            });
+        }
+
+    });
+    </script>
+</body>
+</html>

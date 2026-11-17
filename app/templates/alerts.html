@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="System Security Alerts. Real-time notifications of potential breaches, unauthorized actions, policy violations, and device status alerts.">
+    <title>Alerts & Notifications - Threat Intelligence Platform</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="{{ url_for('static', filename='js/1-funtioning.js') }}" defer></script>
+</head>
+<body class="dashboard-page">
+
+    <!-- Top Navigation Header -->
+    <header class="main-header">
+        <nav class="navbar dashboard-navbar" aria-label="Main Navigation">
+            <div class="navbar-brand">
+                <a href="{{ url_for('main.home') }}" class="logo-link">
+                    <span class="logo-icon">&#128737;</span>
+                    <span class="logo-text">ThreatIntel Platform</span>
+                </a>
+            </div>
+
+            <!-- Global Quick Search -->
+            <div class="navbar-search">
+                <form action="{{ url_for('dashboard.search_threats') }}" method="GET" class="search-form">
+                    <label for="global-search" class="visually-hidden">Search threats, IPs, hashes</label>
+                    <input type="search" id="global-search" name="query" class="search-input" placeholder="Search threats, IPs, CVEs...">
+                    <button type="submit" class="search-button">Search</button>
+                </form>
+            </div>
+
+            <div class="navbar-user-menu">
+                <span class="user-role badge-critical">{{ current_user.role|capitalize if current_user.is_authenticated else 'Analyst' }}</span>
+                <a href="{{ url_for('dashboard.profile') }}" class="user-profile-link">Profile Settings</a>
+                <a href="{{ url_for('auth.logout') if 'auth.logout' in url_for.__globals__ else url_for('auth.login') }}" class="logout-link">Sign Out</a>
+            </div>
+        </nav>
+    </header>
+
+    <div class="layout-container">
+        
+        <!-- Left Sidebar Navigation -->
+        <aside class="sidebar" aria-label="Sidebar Navigation">
+            <nav class="sidebar-navigation">
+                <ul class="sidebar-menu">
+                    <li><a href="{{ url_for('dashboard.dashboard') }}" class="menu-item">Dashboard Overview</a></li>
+                    <li><a href="{{ url_for('dashboard.threat_feed') }}" class="menu-item">Live Threat Feed</a></li>
+                    <li><a href="{{ url_for('dashboard.threat_news') }}" class="menu-item">Threat News</a></li>
+                    <li><a href="{{ url_for('dashboard.ip_checker') }}" class="menu-item">IP Address Checker</a></li>
+                    <li><a href="{{ url_for('dashboard.malware_info') }}" class="menu-item">Malware Information</a></li>
+                    <li><a href="{{ url_for('dashboard.threat_report_upload') }}" class="menu-item">Upload Threat Report</a></li>
+                    <li><a href="{{ url_for('dashboard.search_threats') }}" class="menu-item">Search Threats Database</a></li>
+                    <li><a href="{{ url_for('dashboard.alerts') }}" class="menu-item active-menu-item">Alerts & Notifications</a></li>
+                    <li><a href="{{ url_for('dashboard.siem_edr_integration') }}" class="menu-item">SIEM / EDR Integration</a></li>
+                    <li><a href="{{ url_for('admin.admin') }}" class="menu-item">System Admin Panel</a></li>
+                </ul>
+            </nav>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="dashboard-main-content">
+            
+            <section class="alerts-section" aria-labelledby="alerts-heading">
+                <header class="section-header">
+                    <h1 id="alerts-heading" class="page-title">Security Alert Center</h1>
+                    <p class="page-subtitle">Central operations hub for alerts generated from IOC risk scoring, external threat enrichment, and graph correlations</p>
+                </header>
+
+                <!-- Flash Messages -->
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        <div class="flash-messages-container" style="margin-bottom: 1.5rem;">
+                            {% for category, message in messages %}
+                                <div class="alert-card {% if category == 'success' %}info-alert-border{% elif category == 'warning' %}warning-alert-border{% else %}critical-alert-border{% endif %}" style="padding: 0.75rem 1.25rem; margin-bottom: 0.5rem;">
+                                    {{ message }}
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                {% endwith %}
+
+                <!-- Alert Stats Summary Bar -->
+                <div class="alert-summary-bar" style="display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap;">
+                    <div class="stat-box count-critical" style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 6px; padding: 0.75rem 1.25rem;">
+                        <strong style="color: #ef4444; font-size: 1.2rem;">{{ counts.critical }}</strong> <span style="color: #cbd5e1;">Critical Alerts</span>
+                    </div>
+                    <div class="stat-box count-warning" style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 6px; padding: 0.75rem 1.25rem;">
+                        <strong style="color: #f59e0b; font-size: 1.2rem;">{{ counts.high }}</strong> <span style="color: #cbd5e1;">High Alerts</span>
+                    </div>
+                    <div class="stat-box count-info" style="background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 6px; padding: 0.75rem 1.25rem;">
+                        <strong style="color: #38bdf8; font-size: 1.2rem;">{{ counts.active }}</strong> <span style="color: #cbd5e1;">Active (Open / In Progress)</span>
+                    </div>
+                    <div class="stat-box count-success" style="background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.3); border-radius: 6px; padding: 0.75rem 1.25rem;">
+                        <strong style="color: #22c55e; font-size: 1.2rem;">{{ counts.resolved }}</strong> <span style="color: #cbd5e1;">Resolved</span>
+                    </div>
+                    {% if counts.unread > 0 %}
+                    <div class="stat-box count-unread" style="background: rgba(168, 85, 247, 0.1); border: 1px solid rgba(168, 85, 247, 0.3); border-radius: 6px; padding: 0.75rem 1.25rem;">
+                        <strong style="color: #c084fc; font-size: 1.2rem;">{{ counts.unread }}</strong> <span style="color: #cbd5e1;">Unread</span>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Interactive Alert Filter Form -->
+                <fieldset class="filter-fieldset" style="margin-bottom: 2rem;">
+                    <legend>Filter & Search Alerts</legend>
+                    <form action="{{ url_for('dashboard.alerts') }}" method="GET" class="filter-form">
+                        <div class="form-row" style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-end;">
+                            
+                            <div class="form-group" style="flex: 2; min-width: 220px;">
+                                <label for="filter-query" class="form-label">Search Query</label>
+                                <input type="text" id="filter-query" name="query" value="{{ query }}" class="form-control" placeholder="Search title, details, IOC value...">
+                            </div>
+
+                            <div class="form-group" style="flex: 1; min-width: 140px;">
+                                <label for="filter-severity" class="form-label">Severity</label>
+                                <select id="filter-severity" name="severity" class="form-select">
+                                    <option value="all" {% if current_severity == 'all' %}selected{% endif %}>All Severities</option>
+                                    <option value="Critical" {% if current_severity == 'Critical' %}selected{% endif %}>Critical</option>
+                                    <option value="High" {% if current_severity == 'High' %}selected{% endif %}>High</option>
+                                    <option value="Medium" {% if current_severity == 'Medium' %}selected{% endif %}>Medium</option>
+                                    <option value="Low" {% if current_severity == 'Low' %}selected{% endif %}>Low</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group" style="flex: 1; min-width: 150px;">
+                                <label for="filter-status" class="form-label">Status</label>
+                                <select id="filter-status" name="status" class="form-select">
+                                    <option value="all" {% if current_status == 'all' %}selected{% endif %}>All Statuses</option>
+                                    <option value="active" {% if current_status == 'active' %}selected{% endif %}>Active (Open/In Prog)</option>
+                                    <option value="Open" {% if current_status == 'Open' %}selected{% endif %}>Open</option>
+                                    <option value="In Progress" {% if current_status == 'In Progress' %}selected{% endif %}>In Progress</option>
+                                    <option value="Resolved" {% if current_status == 'Resolved' %}selected{% endif %}>Resolved</option>
+                                    <option value="Closed" {% if current_status == 'Closed' %}selected{% endif %}>Closed</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group" style="flex: 1; min-width: 140px;">
+                                <label for="filter-type" class="form-label">Alert Type</label>
+                                <select id="filter-type" name="alert_type" class="form-select">
+                                    <option value="all" {% if current_type == 'all' %}selected{% endif %}>All Types</option>
+                                    <option value="EDR" {% if current_type == 'EDR' %}selected{% endif %}>EDR Alerts</option>
+                                    <option value="SIEM/EDR" {% if current_type == 'SIEM/EDR' %}selected{% endif %}>SIEM/EDR Webhook</option>
+                                    <option value="Risk Score" {% if current_type == 'Risk Score' %}selected{% endif %}>Risk Score</option>
+                                    <option value="Enrichment" {% if current_type == 'Enrichment' %}selected{% endif %}>Enrichment</option>
+                                    <option value="Correlation" {% if current_type == 'Correlation' %}selected{% endif %}>Correlation</option>
+                                    <option value="General" {% if current_type == 'General' %}selected{% endif %}>General</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group" style="display: flex; gap: 0.5rem;">
+                                <button type="submit" class="btn btn-filter btn-primary">Apply Filters</button>
+                                <a href="{{ url_for('dashboard.alerts') }}" class="btn btn-reset btn-secondary">Clear</a>
+                            </div>
+
+                        </div>
+                    </form>
+                </fieldset>
+
+                <!-- Alerts List Area -->
+                <div class="alerts-list">
+                    
+                    {% if alerts %}
+
+                        {% for alert in alerts %}
+                        <article class="alert-card {% if alert.severity == 'Critical' %}critical-alert-border{% elif alert.severity == 'High' %}warning-alert-border{% else %}info-alert-border{% endif %}" id="alert-card-{{ alert.id }}">
+                            <header class="alert-card-header">
+                                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                                    
+                                    {% if alert.severity == 'Critical' %}
+                                    <span class="badge badge-critical">Critical</span>
+                                    {% elif alert.severity == 'High' %}
+                                    <span class="badge badge-warning">High</span>
+                                    {% elif alert.severity == 'Medium' %}
+                                    <span class="badge badge-info">Medium</span>
+                                    {% else %}
+                                    <span class="badge badge-success">Low</span>
+                                    {% endif %}
+
+                                    {% if alert.alert_type == 'EDR' %}
+                                    <span class="badge" style="background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.4); font-size: 0.75rem;">
+                                        &#128737; EDR Sensor
+                                    </span>
+                                    {% elif alert.alert_type == 'SIEM/EDR' %}
+                                    <span class="badge" style="background: rgba(6, 182, 212, 0.2); color: #22d3ee; border: 1px solid rgba(6, 182, 212, 0.4); font-size: 0.75rem;">
+                                        &#9889; SIEM Webhook
+                                    </span>
+                                    {% else %}
+                                    <span class="badge badge-secondary" style="background: rgba(148, 163, 184, 0.15); color: #94a3b8; font-size: 0.75rem;">
+                                        {{ alert.alert_type }}
+                                    </span>
+                                    {% endif %}
+
+                                    {% if alert.status == 'Open' %}
+                                    <span class="badge badge-critical" style="font-size: 0.75rem;">Open</span>
+                                    {% elif alert.status == 'In Progress' %}
+                                    <span class="badge badge-warning" style="font-size: 0.75rem;">In Progress</span>
+                                    {% elif alert.status == 'Resolved' %}
+                                    <span class="badge badge-success" style="font-size: 0.75rem;">Resolved</span>
+                                    {% else %}
+                                    <span class="badge badge-secondary" style="font-size: 0.75rem;">Closed</span>
+                                    {% endif %}
+
+                                    {% if not alert.is_read %}
+                                    <span class="badge badge-primary" style="background: #a855f7; color: #ffffff; font-size: 0.72rem;">New / Unread</span>
+                                    {% endif %}
+
+                                    <span style="color: #64748b; font-size: 0.8rem; margin-left: 6px;">#AL-{{ alert.id }}</span>
+                                </div>
+
+                                <span class="alert-timestamp">
+                                    {{ alert.created_at.strftime('%Y-%m-%d %H:%M:%S UTC') if alert.created_at else 'N/A' }}
+                                </span>
+                            </header>
+
+                            <div class="alert-card-body">
+                                <h2 class="alert-title">
+                                    <a href="{{ url_for('dashboard.alert_details', alert_id=alert.id) }}" style="color: inherit; text-decoration: none;">
+                                        {{ alert.title }}
+                                    </a>
+                                </h2>
+
+                                <p class="alert-details">
+                                    {% if alert.indicator %}
+                                    <strong>Related IOC:</strong> 
+                                    <code>{{ alert.indicator.indicator_value }}</code> ({{ alert.indicator.indicator_type }})
+                                        {% if alert.indicator.risk_score is not none %}
+                                        &bull; <strong>Risk Score:</strong> <span style="color: #38bdf8; font-weight: bold;">{{ alert.indicator.risk_score }}/100</span>
+                                        {% endif %}
+                                    {% endif %}
+
+                                    {% if alert.malware %}
+                                    &bull; <strong>Associated Malware:</strong> 
+                                    <span style="color: #f59e0b; font-weight: 500;">{{ alert.malware.malware_name }}</span> ({{ alert.malware.malware_type }})
+                                    {% endif %}
+                                </p>
+
+                                {% if alert.description %}
+                                <p class="alert-description">
+                                    {{ alert.description }}
+                                </p>
+                                {% endif %}
+                            </div>
+
+                            <footer class="alert-card-footer">
+                                <div class="alert-action-form" style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                                    
+                                    <!-- View Details Button -->
+                                    <a href="{{ url_for('dashboard.alert_details', alert_id=alert.id) }}" class="btn btn-action btn-secondary">
+                                        View Details
+                                    </a>
+
+                                    <!-- Mark Read Form -->
+                                    {% if not alert.is_read %}
+                                    <form action="{{ url_for('dashboard.alert_mark_read_route', alert_id=alert.id) }}" method="POST" style="display: inline;">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn btn-action btn-secondary">Mark Read</button>
+                                    </form>
+                                    {% endif %}
+
+                                    <!-- Acknowledge Button (Open -> In Progress) -->
+                                    {% if alert.status == 'Open' %}
+                                    <form action="{{ url_for('dashboard.alert_acknowledge_route', alert_id=alert.id) }}" method="POST" style="display: inline;">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn btn-action btn-warning">Acknowledge</button>
+                                    </form>
+                                    {% endif %}
+
+                                    <!-- Resolve Button (Open/In Progress -> Resolved) -->
+                                    {% if alert.status in ['Open', 'In Progress'] %}
+                                    <form action="{{ url_for('dashboard.alert_resolve_route', alert_id=alert.id) }}" method="POST" style="display: inline;">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn btn-action btn-success">Mark Resolved</button>
+                                    </form>
+                                    {% endif %}
+
+                                    <!-- Reopen Button (Resolved/Closed -> Open) -->
+                                    {% if alert.status in ['Resolved', 'Closed'] %}
+                                    <form action="{{ url_for('dashboard.alert_reopen_route', alert_id=alert.id) }}" method="POST" style="display: inline;">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn btn-action btn-primary">Reopen Alert</button>
+                                    </form>
+                                    {% endif %}
+
+                                    <!-- Analyze IOC Quick Link -->
+                                    {% if alert.indicator and alert.indicator.indicator_type|lower in ['ip', 'ipv4'] %}
+                                    <a href="{{ url_for('dashboard.ip_checker', ip=alert.indicator.indicator_value) }}" class="btn btn-action btn-secondary" style="margin-left: auto;">
+                                        Analyze IP
+                                    </a>
+                                    {% elif alert.indicator %}
+                                    <a href="{{ url_for('dashboard.search_threats', query=alert.indicator.indicator_value) }}" class="btn btn-action btn-secondary" style="margin-left: auto;">
+                                        Find Related
+                                    </a>
+                                    {% endif %}
+
+                                </div>
+                            </footer>
+                        </article>
+                        {% endfor %}
+
+                    {% else %}
+
+                        <div class="empty-state-card" style="text-align: center; padding: 3rem 1.5rem; color: #94a3b8; background: var(--bg-secondary); border-radius: var(--radius-lg); border: 1px dashed var(--border-color);">
+                            <span style="font-size: 2.5rem; display: block; margin-bottom: 0.75rem;">🛡️</span>
+                            <h3 style="font-size: 1.2rem; color: #f1f5f9; margin-bottom: 0.5rem;">No Security Alerts Found</h3>
+                            <p style="font-size: 0.95rem;">There are no alerts matching your current filter criteria or search query.</p>
+                            <a href="{{ url_for('dashboard.alerts') }}" class="btn btn-primary" style="margin-top: 1rem; display: inline-block;">Reset Filters</a>
+                        </div>
+
+                    {% endif %}
+
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- Global Platform Footer -->
+    <footer class="main-footer">
+        <div class="footer-content">
+            <p class="copyright-text">&copy; 2026 Threat Intelligence Platform. All Rights Reserved. Securing Assets Globally.</p>
+            <nav class="footer-links" aria-label="Legal Links">
+                <a href="#" class="footer-link">Privacy Policy</a>
+                <span class="separator">|</span>
+                <a href="#" class="footer-link">Terms of Service</a>
+                <span class="separator">|</span>
+                <a href="#" class="footer-link">Security Audit Logs</a>
+            </nav>
+        </div>
+    </footer>
+
+</body>
+</html>

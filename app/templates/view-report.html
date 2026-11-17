@@ -1,0 +1,1017 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <meta name="description" content="View Threat Report">
+
+    <title>
+
+        View Threat Report |
+        Threat Intelligence Platform
+
+    </title>
+
+    <link rel="stylesheet" href="{{ url_for('static',
+          filename='css/style.css') }}">
+
+</head>
+
+<body class="dashboard-page" style="font-size: 20px;">
+
+    <!-- ===========================
+        TOP NAVBAR
+============================ -->
+
+    <header class="main-header">
+
+        <nav class="navbar dashboard-navbar">
+
+            <div class="navbar-brand">
+
+                <a href="{{ url_for('main.home') }}" class="logo-link">
+
+                    <span class="logo-icon">
+
+                        🛡
+
+                    </span>
+
+                    <span class="logo-text">
+
+                        ThreatIntel Platform
+
+                    </span>
+
+                </a>
+
+            </div>
+
+            <!-- Search -->
+
+            <div class="navbar-search">
+
+                <form action="{{ url_for('dashboard.search_threats') }}" method="GET" class="search-form">
+
+                    <input type="search" name="query" class="search-input"
+                        placeholder="Search Threats, CVEs, Reports...">
+
+                    <button type="submit" class="search-button">
+
+                        Search
+
+                    </button>
+
+                </form>
+
+            </div>
+
+            <!-- User -->
+
+            <div class="navbar-user-menu">
+
+                <span class="user-role badge-critical">
+
+                    {{ current_user.role|capitalize }}
+
+                </span>
+
+                <a href="{{ url_for('dashboard.profile') }}" class="user-profile-link">
+
+                    Profile
+
+                </a>
+
+                <div class="user-actions">
+
+                    <span class="user-name">
+
+                        Welcome,
+                        {{ current_user.username }}
+
+                    </span>
+
+                    <a href="{{ url_for('auth.logout') }}" class="logout-link">
+
+                        Logout
+
+                    </a>
+
+                </div>
+
+            </div>
+
+        </nav>
+
+    </header>
+
+    <!-- ===========================
+        MAIN LAYOUT
+============================ -->
+
+    <div class="layout-container">
+
+        <!-- ===========================
+            SIDEBAR
+    ============================ -->
+
+        <aside class="sidebar">
+
+            <nav class="sidebar-navigation">
+
+                <ul class="sidebar-menu">
+
+                    <li>
+                        <a href="{{ url_for('dashboard.dashboard') }}" class="menu-item">
+
+                            Dashboard Overview
+
+                        </a>
+                    </li>
+
+                    <li>
+                        <a href="{{ url_for('dashboard.threat_feed') }}" class="menu-item">
+
+                            Live Threat Feed
+
+                        </a>
+                    </li>
+
+                    <li>
+                        <a href="{{ url_for('dashboard.ip_checker') }}" class="menu-item">
+
+                            IP Address Checker
+
+                        </a>
+                    </li>
+
+                    <li>
+                        <a href="{{ url_for('dashboard.malware_info') }}" class="menu-item">
+
+                            Malware Information
+
+                        </a>
+                    </li>
+
+                    <li>
+                        <a href="{{ url_for('dashboard.threat_report_upload') }}" class="menu-item">
+
+                            Upload Threat Report
+
+                        </a>
+                    </li>
+
+                    <li>
+
+                        <a href="{{ url_for('dashboard.threat_reports') }}" class="menu-item active-menu-item">
+
+                            Threat Reports
+
+                        </a>
+
+                    </li>
+
+                    <li>
+                        <a href="{{ url_for('dashboard.search_threats') }}" class="menu-item">
+
+                            Search Threats
+
+                        </a>
+                    </li>
+
+                    <li>
+                        <a href="{{ url_for('dashboard.alerts') }}" class="menu-item">
+
+                            Alerts
+
+                        </a>
+                    </li>
+
+                    <li>
+                        <a href="{{ url_for('admin.admin') }}" class="menu-item">
+
+                            Admin Panel
+
+                        </a>
+                    </li>
+
+                </ul>
+
+            </nav>
+
+        </aside>
+
+        <!-- ===========================
+            MAIN CONTENT
+    ============================ -->
+
+        <main class="dashboard-main-content">
+
+            <!-- ===========================
+                PAGE HEADER
+        ============================ -->
+
+            <section class="dashboard-overview">
+
+                <header class="section-header">
+
+                    <div>
+
+                        <h1 class="page-title">
+
+                            Threat Report Details
+
+                        </h1>
+
+                        <p class="page-subtitle"style="font-size: 20px;">
+
+                            View complete information about the selected threat report.
+
+                        </p>
+
+                    </div>
+
+                    <div>
+
+                        <a href="{{ url_for('dashboard.threat_reports') }}" class="btn btn-secondary"style="font-size: 20px;">
+
+                            ← Back to Reports
+
+                        </a>
+
+                    </div>
+
+                </header>
+
+            </section><!-- ==========================================================
+     REPORT DETAILS
+=========================================================== -->
+
+            <section class="recent-activity-section">
+
+                <header class="section-header">
+
+                    <h2 class="section-title">
+
+                        Report Information
+
+                    </h2>
+
+                </header>
+
+                <div class="dashboard-cards-grid">
+
+                    <!-- Report Summary -->
+
+                    <article class="dashboard-card">
+
+                        <header class="card-header">
+
+                            <h3 class="card-title">
+
+                                {{ report.title }}
+
+                            </h3>
+
+                            <span class="card-icon">
+
+                                📄
+
+                            </span>
+
+                        </header>
+
+                        <p>
+
+                            {{ report.description }}
+
+                        </p>
+
+                    </article>
+
+                    <!-- Severity -->
+
+                    <article class="dashboard-card status-critical">
+
+                        <header class="card-header">
+
+                            <h3 class="card-title">
+
+                                Severity
+
+                            </h3>
+
+                            <span class="card-icon">
+
+                                🚨
+
+                            </span>
+
+                        </header>
+
+                        <p class="card-value">
+
+                            {{ report.severity }}
+
+                        </p>
+
+                    </article>
+
+                    <!-- Status -->
+
+                    <article class="dashboard-card status-warning">
+
+                        <header class="card-header">
+
+                            <h3 class="card-title">
+
+                                Status
+
+                            </h3>
+
+                            <span class="card-icon">
+
+                                ⚠
+
+                            </span>
+
+                        </header>
+
+                        <p class="card-value">
+
+                            {{ report.status }}
+
+                        </p>
+
+                    </article>
+
+                    <!-- TLP -->
+
+                    <article class="dashboard-card status-info">
+
+                        <header class="card-header">
+
+                            <h3 class="card-title">
+
+                                TLP Level
+
+                            </h3>
+
+                            <span class="card-icon">
+
+                                🔒
+
+                            </span>
+
+                        </header>
+
+                        <p class="card-value">
+
+                            {{ report.tlp_level }}
+
+                        </p>
+
+                    </article>
+
+                </div>
+
+            </section>
+
+            <!-- ==========================================================
+            REPORT METADATA
+            =========================================================== -->
+
+            <section class="recent-activity-section">
+
+                <header class="section-header">
+
+                    <h2 class="section-title">
+
+                        Report Metadata
+
+                    </h2>
+
+                </header>
+
+                <table class="data-table">
+
+                    <tbody>
+
+                        <tr>
+
+                            <th>Category</th>
+
+                            <td>{{ report.category }}</td>
+
+                        </tr>
+
+                        <tr>
+
+                            <th>Target Sector</th>
+
+                            <td>{{ report.target_sector }}</td>
+
+                        </tr>
+
+                        <tr>
+
+                            <th>Uploaded By</th>
+
+                            <td>{{ report.user.username }}</td>
+
+                        </tr>
+
+                        <tr>
+
+                            <th>Created On</th>
+
+                            <td>
+
+                                {{ report.created_at.strftime("%d-%m-%Y %I:%M %p") }}
+
+                            </td>
+
+                        </tr>
+
+                        <tr>
+
+                            <th>Last Updated</th>
+
+                            <td>
+
+                                {{ report.updated_at.strftime("%d-%m-%Y %I:%M %p") }}
+
+                            </td>
+
+                        </tr>
+
+                    </tbody>
+
+                </table>
+
+            </section>
+
+            <!-- ==========================================================
+     ATTACHMENT
+=========================================================== -->            
+        <section class="dashboard-card">
+
+            <header class="section-header">
+
+                <h2 class="section-title">
+
+                    Attachment
+
+                </h2>
+
+            </header>
+
+            {% if report.attachment %}
+
+                <div class="dashboard-card">
+
+                    <p>
+
+                        <i class="fas fa-paperclip"></i>
+                        <strong>File:</strong>
+                        {{ report.attachment }}
+                    </p>
+                    <br>
+                      <a href="{{ url_for('dashboard.download_attachment', report_id=report.id) }}" class="btn btn-primary">
+                        <i class="fas fa-download"></i>
+                        Download Attachment
+                    </a>
+                </div>
+            {% else %}
+                <div class="dashboard-card">
+                    <p>
+                        No attachment available.
+                    </p>
+                </div>
+            {% endif %}
+        </section> <!-- ==========================================================
+     RELATED MALWARE
+=========================================================== -->
+
+            <section class="recent-activity-section">
+
+                <header class="section-header">
+
+                    <h2 class="section-title">
+
+                        Related Malware
+
+                    </h2>
+
+                </header>
+
+                {% if report.malwares %}
+
+                <table class="data-table">
+
+                    <thead>
+
+                        <tr>
+
+                            <th>Name</th>
+
+                            <th>Family</th>
+
+                            <th>Severity</th>
+
+                        </tr>
+
+                    </thead>
+
+                    <tbody>
+
+                        {% for malware in report.malwares %}
+
+                        <tr>
+
+                            <td>{{ malware.name }}</td>
+
+                            <td>{{ malware.family }}</td>
+
+                            <td>
+
+                                <span class="badge badge-critical">
+
+                                    {{ malware.severity }}
+
+                                </span>
+
+                            </td>
+
+                        </tr>
+
+                        {% endfor %}
+
+                    </tbody>
+
+                </table>
+
+                {% else %}
+
+                <div class="dashboard-card">
+
+                    <p>
+
+                        No related malware found.
+
+                    </p>
+
+                </div>
+
+                {% endif %}
+
+            </section>
+
+
+            <!-- ==========================================================
+     THREAT INDICATORS
+=========================================================== -->
+
+            <section class="recent-activity-section">
+
+                <header class="section-header">
+
+                    <h2 class="section-title">
+
+                        Threat Indicators (IOCs)
+
+                    </h2>
+
+                </header>
+
+                {% if report.indicators %}
+
+                <table class="data-table">
+
+                    <thead>
+
+                        <tr>
+
+                            <th>Indicator</th>
+
+                            <th>Type</th>
+
+                            <th>Confidence</th>
+
+                        </tr>
+
+                    </thead>
+
+                    <tbody>
+
+                        {% for indicator in report.indicators %}
+
+                        <tr>
+
+                            <td>
+
+                                {{ indicator.indicator_value or indicator.value }}
+
+                            </td>
+
+                            <td>
+
+                                {{ indicator.indicator_type }}
+
+                            </td>
+
+                            <td>
+
+                                {{ indicator.confidence_score or indicator.confidence }}
+
+                            </td>
+
+                        </tr>
+
+                        {% endfor %}
+
+                    </tbody>
+
+                </table>
+
+                {% else %}
+
+                <div class="dashboard-card">
+
+                    <p>
+
+                        No Indicators of Compromise linked with this report.
+
+                    </p>
+
+                </div>
+
+                {% endif %}
+
+            </section>
+
+
+            <!-- ==========================================================
+     ACTIONS
+=========================================================== -->
+
+            <section class="notification-section">
+
+                <header class="section-header">
+
+                    <h2 class="section-title">
+
+                        Report Actions
+
+                    </h2>
+
+                </header>
+
+                <div class="dashboard-cards-grid">
+                    <article class="dashboard-card status-info">
+                        <header class="card-header">
+                            <h3 class="card-title" style="font-size: 20px;">
+                                Back
+                            </h3>
+                            <span class="card-icon">
+                                ↩
+                            </span>
+                        </header>
+                        <p>
+                            Return to all threat reports.
+                        </p>
+                        <footer class="card-footer">
+                            <a href="{{ url_for('dashboard.threat_reports') }}" class="card-link" style="font-size: 30px;">
+                                Open →
+                            </a>
+                        </footer>
+                    </article>
+
+                    <article class="dashboard-card status-warning">
+
+                        <header class="card-header">
+
+                            <h3 class="card-title" style="font-size: 20px;">
+
+                                Edit Report
+
+                            </h3>
+
+                            <span class="card-icon" >
+
+                                ✏
+
+                            </span>
+
+                        </header>
+
+                        <p style="font-size:20px;">
+
+                            Update report details.
+
+                        </p>
+
+                        <!-- style="background-color: #1f86da0f; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer;  -->
+
+                        <footer class="card-footer">
+
+                            <a href="#" class="card-link" style="font-size: 30px;">
+
+                                Edit →
+
+                            </a>
+
+                        </footer>
+
+                    </article>
+
+
+                    <article class="dashboard-card status-critical">
+
+                        <header class="card-header">
+
+                            <h3 class="card-title"style="font-size: 20px;">
+
+                                Delete Report
+
+                            </h3>
+
+                            <span class="card-icon">
+                                🗑
+                            </span>
+
+                        </header>
+
+                        <p>
+
+                            Remove this report permanently.
+                        </p>
+
+                        <footer class="card-footer">
+                            <article class="dashboard-card status-critical">
+                                <header class="card-header">
+                                    <h3 class="card-title"style="font-size:20px;">
+                                        Delete Report
+                                    </h3>
+                                    <span class="card-icon">
+                                        🗑
+                                    </span>
+                                </header>
+                                <p style="font-size:20px;">
+                                    Permanently delete this report and its attachment.
+                                </p>
+                                <footer class="card-footer">
+                                    <form action="{{ url_for('dashboard.delete_report', report_id=report.id) }}" method="POST" class="delete-form">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="card-link delete-btn" style="background-color: #e74c3c; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-size: 20px;">
+                                            Delete →
+                                        </button>
+                                    </form>
+                                </footer>
+                            </article>
+                        </footer>
+                    </article>
+                </div>
+            </section>
+            <!-- ==========================================================
+     QUICK ACTIONS
+=========================================================== -->
+
+            <section class="notification-section">
+
+                <header class="section-header">
+
+                    <h2 class="section-title">
+
+                        Quick Actions
+
+                    </h2>
+
+                </header>
+
+                <div class="dashboard-cards-grid">
+
+                    <!-- Upload Report -->
+
+                    <article class="dashboard-card status-success">
+
+                        <header class="card-header">
+
+                            <h3 class="card-title">
+
+                                Upload Report
+
+                            </h3>
+
+                            <span class="card-icon">
+
+                                📤
+
+                            </span>
+
+                        </header>
+
+                        <p>
+
+                            Submit a new Threat Intelligence Report.
+
+                        </p>
+
+                        <footer class="card-footer">
+
+                            <a href="{{ url_for('dashboard.threat_report_upload') }}" class="card-link">
+
+                                Upload →
+
+                            </a>
+
+                        </footer>
+
+                    </article>
+
+                    <!-- Threat Reports -->
+
+                    <article class="dashboard-card status-info">
+
+                        <header class="card-header">
+
+                            <h3 class="card-title">
+
+                                Threat Reports
+
+                            </h3>
+
+                            <span class="card-icon">
+
+                                📄
+
+                            </span>
+
+                        </header>
+
+                        <p>
+
+                            Return to the reports repository.
+
+                        </p>
+
+                        <footer class="card-footer">
+
+                            <a href="{{ url_for('dashboard.threat_reports') }}" class="card-link">
+
+                                Open →
+
+                            </a>
+
+                        </footer>
+
+                    </article>
+
+                    <!-- Dashboard -->
+
+                    <article class="dashboard-card status-warning">
+
+                        <header class="card-header">
+
+                            <h3 class="card-title">
+
+                                Dashboard
+
+                            </h3>
+
+                            <span class="card-icon">
+
+                                📊
+
+                            </span>
+
+                        </header>
+
+                        <p>
+
+                            View platform statistics and analytics.
+
+                        </p>
+
+                        <footer class="card-footer">
+
+                            <a href="{{ url_for('dashboard.dashboard') }}" class="card-link">
+
+                                Dashboard →
+
+                            </a>
+
+                        </footer>
+
+                    </article>
+
+                    <!-- Alerts -->
+
+                    <article class="dashboard-card status-critical">
+
+                        <header class="card-header">
+
+                            <h3 class="card-title">
+
+                                Alerts
+
+                            </h3>
+
+                            <span class="card-icon">
+
+                                🚨
+
+                            </span>
+
+                        </header>
+
+                        <p>
+
+                            View active security alerts.
+
+                        </p>
+
+                        <footer class="card-footer">
+
+                            <a href="{{ url_for('dashboard.alerts') }}" class="card-link">
+
+                                Open →
+
+                            </a>
+
+                        </footer>
+
+                    </article>
+
+                </div>
+
+            </section>
+
+
+            <!-- ==========================================================
+     FOOTER
+=========================================================== -->
+
+        </main>
+
+    </div>
+
+    <footer class="main-footer">
+
+        <div class="footer-content">
+
+            <p>
+
+                &copy; 2026 Threat Intelligence Platform.
+                All Rights Reserved.
+
+            </p>
+
+            <nav class="footer-links">
+
+                <a href="#">
+
+                    Privacy Policy
+
+                </a>
+
+                <span>|</span>
+
+                <a href="#">
+
+                    Terms of Service
+
+                </a>
+
+                <span>|</span>
+
+                <a href="#">
+
+                    Security Logs
+
+                </a>
+
+            </nav>
+
+        </div>
+
+    </footer>
+
+
+    <!-- ==========================================================
+     JAVASCRIPT
+=========================================================== -->
+
+    <script src="{{ url_for('static',
+filename='js/1-funtioning.js') }}"></script>
+
+    <script src="{{ url_for('static',
+filename='js/view-report.js') }}"></script>
+
+</body>
+
+</html>

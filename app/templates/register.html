@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Secure registration portal for the Threat Intelligence Platform. Create an analyst account.">
+    <title>Registration - Threat Intelligence Platform</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="{{ url_for('static', filename='js/1-funtioning.js') }}" defer></script>
+</head>
+<body class="auth-page">
+
+    <!-- Primary Top Navigation Bar -->
+    <header class="main-header">
+        <nav class="navbar auth-navbar" aria-label="Main Navigation">
+            <div class="navbar-brand">
+                <a href="{{ url_for('main.home') }}" class="logo-link">
+                    <span class="logo-icon">&#128737;</span>
+                    <span class="logo-text">ThreatIntel Platform</span>
+                </a>
+            </div>
+            <div class="navbar-actions">
+                <ul class="nav-links">
+                    <li><a href="{{ url_for('main.home') }}" class="nav-link">Home</a></li>
+                    <li><a href="{{ url_for('auth.login') }}" class="nav-link nav-link-highlight">Log In</a></li>
+                </ul>
+            </div>
+        </nav>
+    </header>
+
+    <!-- Main Authentication Layout -->
+    <main class="auth-main-content">
+        <section class="auth-section" aria-labelledby="register-title">
+            <article class="auth-card">
+                <header class="auth-card-header">
+                    <h1 id="register-title" class="auth-title">Create Analyst Account</h1>
+                    <p class="auth-subtitle">Register to request access to security telemetry and intelligence feeds</p>
+                </header>
+
+                <!-- Status / Alert Area -->
+                <div class="auth-status-message info-message" role="alert">
+                    <span class="status-icon">&#8505;</span>
+                    <span class="status-text">Corporate analyst registration. Active security auditing is enabled.</span>
+                </div>
+
+                <!-- Flash Messages -->
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="auth-status-message {{ category }} {{ category }}-message" role="alert">
+                                <span class="status-text">{{ message }}</span>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+
+                <form action="{{ url_for('auth.register') }}" method="POST" class="auth-form" autocomplete="on">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                    <fieldset class="form-fieldset">
+                        <legend class="visually-hidden">Registration Details</legend>
+
+                        <!-- Username -->
+                        <div class="form-group">
+                            <label for="username" class="form-label">Username</label>
+                            <input
+                                type="text"
+                                id="username"
+                                name="username"
+                                class="form-input"
+                                placeholder="e.g. secops_analyst"
+                                required
+                                autocomplete="username"
+                            >
+                        </div>
+
+                        <!-- Email -->
+                        <div class="form-group">
+                            <label for="email" class="form-label">Corporate Email Address</label>
+                            <input
+                                type="email"
+                                id="email"
+                                name="email"
+                                class="form-input"
+                                placeholder="analyst@organization.com"
+                                required
+                                autocomplete="email"
+                            >
+                        </div>
+
+                        <!-- Password & Confirm Password -->
+                        <div class="form-row">
+                            <div class="form-group half-width">
+                                <label for="password" class="form-label">Password</label>
+                                <div class="password-input-wrapper">
+                                    <input
+                                        type="password"
+                                        id="password"
+                                        name="password"
+                                        class="form-input"
+                                        placeholder="Enter Password"
+                                        required
+                                        autocomplete="new-password"
+                                    >
+                                    <button type="button" class="password-toggle-btn" aria-label="Show password" aria-controls="password" aria-pressed="false" tabindex="0">
+                                        <svg class="eye-icon" viewBox="0 0 24 24" aria-hidden="true">
+                                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                            <circle cx="12" cy="12" r="3"></circle>
+                                        </svg>
+                                        <svg class="eye-off-icon" viewBox="0 0 24 24" aria-hidden="true" style="display: none;">
+                                            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                                            <line x1="1" y1="1" x2="23" y2="23"></line>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="form-group half-width">
+                                <label for="confirm-password" class="form-label">Confirm Password</label>
+                                <div class="password-input-wrapper">
+                                    <input
+                                        type="password"
+                                        id="confirm-password"
+                                        name="confirm_password"
+                                        class="form-input"
+                                        placeholder="Confirm Password"
+                                        required
+                                        autocomplete="new-password"
+                                    >
+                                    <button type="button" class="password-toggle-btn" aria-label="Show confirm password" aria-controls="confirm-password" aria-pressed="false" tabindex="0">
+                                        <svg class="eye-icon" viewBox="0 0 24 24" aria-hidden="true">
+                                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                            <circle cx="12" cy="12" r="3"></circle>
+                                        </svg>
+                                        <svg class="eye-off-icon" viewBox="0 0 24 24" aria-hidden="true" style="display: none;">
+                                            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                                            <line x1="1" y1="1" x2="23" y2="23"></line>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Password Policy Hint -->
+                        <div class="password-policy-hint">
+                            <strong>Password Policy:</strong> Minimum 8 characters with uppercase, lowercase, digit, and special character (e.g. <code>!@#$%^&*</code>).
+                        </div>
+
+                        <!-- Terms -->
+                        <div class="form-group form-checkbox-group" style="margin-top: 1.25rem;">
+                            <input
+                                type="checkbox"
+                                id="terms-agree"
+                                name="terms_agree"
+                                class="form-checkbox"
+                                required
+                            >
+                            <label for="terms-agree" class="form-checkbox-label">
+                                I agree to the <a href="#" class="redirect-link">Terms of Service &amp; Security Policy</a>
+                            </label>
+                        </div>
+
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-submit btn-primary">
+                                Register Account
+                            </button>
+                        </div>
+                    </fieldset>
+                </form>
+
+                <footer class="auth-card-footer">
+                    <p class="auth-redirect">Already have an analyst account? <a href="{{ url_for('auth.login') }}" class="redirect-link">Log In / Sign In</a></p>
+                </footer>
+            </article>
+        </section>
+    </main>
+
+    <!-- Global Platform Footer -->
+    <footer class="main-footer">
+        <div class="footer-content">
+            <p class="copyright-text">&copy; 2026 Threat Intelligence Platform. All Rights Reserved. Securing Assets Globally.</p>
+            <nav class="footer-links" aria-label="Legal Links">
+                <a href="#" class="footer-link">Privacy Policy</a>
+                <span class="separator">|</span>
+                <a href="#" class="footer-link">Terms of Service</a>
+                <span class="separator">|</span>
+                <a href="#" class="footer-link">Security Audit Logs</a>
+            </nav>
+        </div>
+    </footer>
+
+</body>
+</html>

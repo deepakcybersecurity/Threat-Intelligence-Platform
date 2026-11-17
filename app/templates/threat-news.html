@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <meta name="description"
+        content="Cybersecurity Threat News and Advisories Feed. Aggregates breaking vulnerabilities, malware campaigns, and advisories from authoritative global intelligence sources.">
+    <title>Threat News - Threat Intelligence Platform</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="{{ url_for('static', filename='js/1-funtioning.js') }}" defer></script>
+</head>
+
+<body class="dashboard-page">
+
+    <!-- Top Navigation Header -->
+    <header class="main-header">
+        <nav class="navbar dashboard-navbar" aria-label="Main Navigation">
+            <div class="navbar-brand">
+                <a href="{{ url_for('main.home') }}" class="logo-link">
+                    <span class="logo-icon">&#128737;</span>
+                    <span class="logo-text">ThreatIntel Platform</span>
+                </a>
+            </div>
+
+            <!-- Global Quick Search -->
+            <div class="navbar-search">
+                <form action="{{ url_for('dashboard.search_threats') }}" method="GET" class="search-form">
+                    <label for="global-search" class="visually-hidden">Search threats, IPs, hashes</label>
+                    <input type="search" id="global-search" name="query" class="search-input"
+                        placeholder="Search threats, IPs, CVEs...">
+                    <button type="submit" class="search-button">Search</button>
+                </form>
+            </div>
+
+            <div class="navbar-user-menu">
+                <span class="user-role badge-critical">{{ current_user.role|capitalize if current_user.role else 'User' }}</span>
+                <a href="{{ url_for('dashboard.profile') }}" class="user-profile-link">Profile Settings</a>
+                <a href="{{ url_for('auth.login') }}" class="logout-link">Sign Out</a>
+            </div>
+        </nav>
+    </header>
+
+    <div class="layout-container">
+
+        <!-- Left Sidebar Navigation -->
+        <aside class="sidebar" aria-label="Sidebar Navigation">
+            <nav class="sidebar-navigation">
+                <ul class="sidebar-menu">
+                    <li><a href="{{ url_for('dashboard.dashboard') }}" class="menu-item">Dashboard Overview</a></li>
+                    <li><a href="{{ url_for('dashboard.threat_feed') }}" class="menu-item">Live Threat Feed</a></li>
+                    <li><a href="{{ url_for('dashboard.threat_news') }}" class="menu-item active-menu-item">Threat News</a></li>
+                    <li><a href="{{ url_for('dashboard.ip_checker') }}" class="menu-item">IP Address Checker</a></li>
+                    <li><a href="{{ url_for('dashboard.malware_info') }}" class="menu-item">Malware Information</a></li>
+                    <li><a href="{{ url_for('dashboard.threat_report_upload') }}" class="menu-item">Upload Threat Report</a></li>
+                    <li><a href="{{ url_for('dashboard.search_threats') }}" class="menu-item">Search Threats Database</a></li>
+                    <li><a href="{{ url_for('dashboard.alerts') }}" class="menu-item">Alerts & Notifications</a></li>
+                    <li><a href="{{ url_for('admin.admin') }}" class="menu-item">System Admin Panel</a></li>
+                </ul>
+            </nav>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="dashboard-main-content">
+
+            <section class="threat-news-section" aria-labelledby="threat-news-heading">
+                
+                <header class="section-header" style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem;">
+                    <div>
+                        <h1 id="threat-news-heading" class="page-title">Cybersecurity Threat News</h1>
+                        <p class="page-subtitle">Aggregated threat intelligence, zero-day alerts, security advisories, and CVE vulnerabilities from authoritative global streams</p>
+                    </div>
+
+                    {% if current_user.role in ['admin', 'analyst'] %}
+                    <div class="header-actions">
+                        <form action="{{ url_for('dashboard.refresh_threat_news') }}" method="POST" id="refresh-news-form" style="display: inline-block;">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" id="refresh-btn" class="btn btn-primary" style="display: inline-flex; align-items: center; gap: 6px;">
+                                <span id="refresh-icon">&#8635;</span>
+                                <span id="refresh-text">Fetch Latest News</span>
+                            </button>
+                        </form>
+                    </div>
+                    {% endif %}
+                </header>
+
+                <!-- Flash Messages -->
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        <div class="flash-messages-container" style="margin-bottom: 1.5rem;">
+                            {% for category, message in messages %}
+                                <div class="alert-card {% if category == 'success' %}info-alert-border{% elif category == 'warning' %}warning-alert-border{% else %}critical-alert-border{% endif %}" style="padding: 0.75rem 1.25rem; margin-bottom: 0.5rem; background: rgba(30, 41, 59, 0.7); border-radius: 6px;">
+                                    {{ message }}
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                {% endwith %}
+
+                <!-- Threat News Statistics Summary Bar -->
+                <div class="news-summary-bar" style="display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap;">
+                    <div class="stat-box" style="background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 6px; padding: 0.75rem 1.25rem; min-width: 150px;">
+                        <strong style="color: #38bdf8; font-size: 1.25rem; display: block;">{{ stats.total }}</strong>
+                        <span style="color: #cbd5e1; font-size: 0.85rem;">Total Articles</span>
+                    </div>
+                    <div class="stat-box" style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 6px; padding: 0.75rem 1.25rem; min-width: 150px;">
+                        <strong style="color: #ef4444; font-size: 1.25rem; display: block;">{{ stats.severities.Critical }}</strong>
+                        <span style="color: #cbd5e1; font-size: 0.85rem;">Critical Severity</span>
+                    </div>
+                    <div class="stat-box" style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 6px; padding: 0.75rem 1.25rem; min-width: 150px;">
+                        <strong style="color: #f59e0b; font-size: 1.25rem; display: block;">{{ stats.severities.High }}</strong>
+                        <span style="color: #cbd5e1; font-size: 0.85rem;">High Severity</span>
+                    </div>
+                    <div class="stat-box" style="background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.3); border-radius: 6px; padding: 0.75rem 1.25rem; min-width: 150px;">
+                        <strong style="color: #22c55e; font-size: 1.25rem; display: block;">{{ stats.sources|length }}</strong>
+                        <span style="color: #cbd5e1; font-size: 0.85rem;">Active Sources</span>
+                    </div>
+                    {% if stats.latest_published_at %}
+                    <div class="stat-box" style="background: rgba(168, 85, 247, 0.1); border: 1px solid rgba(168, 85, 247, 0.3); border-radius: 6px; padding: 0.75rem 1.25rem; min-width: 180px;">
+                        <strong style="color: #c084fc; font-size: 1rem; display: block;">{{ stats.latest_published_at.strftime('%d-%m-%Y %H:%M') }}</strong>
+                        <span style="color: #cbd5e1; font-size: 0.85rem;">Latest Sighting</span>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Threat News Filter & Search Bar -->
+                <fieldset class="filter-fieldset" style="margin-bottom: 2rem;">
+                    <legend>Filter & Search News</legend>
+                    <form action="{{ url_for('dashboard.threat_news') }}" method="GET" class="filter-form">
+                        <div class="form-row" style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-end;">
+                            
+                            <div class="form-group" style="flex: 2; min-width: 220px;">
+                                <label for="filter-query" class="form-label">Search Keywords</label>
+                                <input type="text" id="filter-query" name="query" value="{{ query }}" class="form-control"
+                                    placeholder="Search CVE, malware name, keyword in title/summary...">
+                            </div>
+
+                            <div class="form-group" style="flex: 1; min-width: 150px;">
+                                <label for="filter-category" class="form-label">Category</label>
+                                <select id="filter-category" name="category" class="form-select">
+                                    <option value="all" {% if current_category == 'all' %}selected{% endif %}>All Categories</option>
+                                    {% for cat in categories %}
+                                    <option value="{{ cat }}" {% if current_category|lower == cat|lower %}selected{% endif %}>{{ cat }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <div class="form-group" style="flex: 1; min-width: 160px;">
+                                <label for="filter-source" class="form-label">Intelligence Source</label>
+                                <select id="filter-source" name="source" class="form-select">
+                                    <option value="all" {% if current_source == 'all' %}selected{% endif %}>All Sources</option>
+                                    {% for src in sources %}
+                                    <option value="{{ src }}" {% if current_source|lower == src|lower %}selected{% endif %}>{{ src }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <div class="form-group" style="flex: 1; min-width: 130px;">
+                                <label for="filter-severity" class="form-label">Severity</label>
+                                <select id="filter-severity" name="severity" class="form-select">
+                                    <option value="all" {% if current_severity == 'all' %}selected{% endif %}>All Severities</option>
+                                    <option value="Critical" {% if current_severity == 'Critical' %}selected{% endif %}>Critical</option>
+                                    <option value="High" {% if current_severity == 'High' %}selected{% endif %}>High</option>
+                                    <option value="Medium" {% if current_severity == 'Medium' %}selected{% endif %}>Medium</option>
+                                    <option value="Low" {% if current_severity == 'Low' %}selected{% endif %}>Low</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group" style="display: flex; gap: 0.5rem; align-items: flex-end;">
+                                <button type="submit" class="btn btn-filter btn-primary">Apply Filters</button>
+                                <a href="{{ url_for('dashboard.threat_news') }}" class="btn btn-reset btn-secondary">Clear</a>
+                            </div>
+
+                        </div>
+                    </form>
+                </fieldset>
+
+                <!-- Articles Grid / List Container -->
+                <div class="articles-container">
+                    {% if articles %}
+                        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 1.25rem; margin-bottom: 2rem;">
+                            {% for article in articles %}
+                            <article class="dashboard-card" style="display: flex; flex-direction: column; justify-content: space-between; background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 1.25rem; transition: transform 0.2s ease, border-color 0.2s ease;">
+                                
+                                <div>
+                                    <!-- Meta Badges Bar -->
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 6px;">
+                                        <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
+                                            <span class="badge badge-info" style="font-size: 0.75rem; padding: 2px 8px;">
+                                                {{ article.source }}
+                                            </span>
+                                            <span class="badge" style="background: rgba(148, 163, 184, 0.2); color: #cbd5e1; font-size: 0.75rem; padding: 2px 8px;">
+                                                {{ article.category or 'General' }}
+                                            </span>
+                                        </div>
+
+                                        <!-- Severity Badge -->
+                                        <div>
+                                            {% if article.severity == 'Critical' %}
+                                                <span class="badge badge-critical" style="font-size: 0.75rem; padding: 2px 8px;">Critical</span>
+                                            {% elif article.severity == 'High' %}
+                                                <span class="badge badge-warning" style="font-size: 0.75rem; padding: 2px 8px;">High</span>
+                                            {% elif article.severity == 'Medium' %}
+                                                <span class="badge badge-info" style="font-size: 0.75rem; padding: 2px 8px;">Medium</span>
+                                            {% else %}
+                                                <span class="badge badge-success" style="font-size: 0.75rem; padding: 2px 8px;">Low</span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+
+                                    <!-- Article Title -->
+                                    <h3 style="font-size: 1.05rem; line-height: 1.4; margin-bottom: 0.6rem; color: #f8fafc; font-weight: 600;">
+                                        {% if article.source_url %}
+                                            <a href="{{ article.source_url }}" target="_blank" rel="noopener noreferrer" style="color: #f8fafc; text-decoration: none;">
+                                                {{ article.title }}
+                                            </a>
+                                        {% else %}
+                                            {{ article.title }}
+                                        {% endif %}
+                                    </h3>
+
+                                    <!-- Publication Date -->
+                                    <div style="color: #94a3b8; font-size: 0.8rem; margin-bottom: 0.75rem;">
+                                        &#128197; {{ article.published_at.strftime('%d-%m-%Y %H:%M UTC') if article.published_at else 'Unknown date' }}
+                                    </div>
+
+                                    <!-- Plain Summary (Safe XSS-escaped text) -->
+                                    <div style="color: #cbd5e1; font-size: 0.88rem; line-height: 1.5; margin-bottom: 1.25rem;">
+                                        {% if article.summary %}
+                                            {{ article.summary[:280] }}{% if article.summary|length > 280 %}...{% endif %}
+                                        {% else %}
+                                            <span style="color: #64748b; font-style: italic;">No summary content provided by external source.</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+
+                                <!-- Card Actions Footer -->
+                                <div style="border-top: 1px solid rgba(255,255,255,0.08); padding-top: 0.75rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                                    {% if article.source_url %}
+                                    <a href="{{ article.source_url }}" target="_blank" rel="noopener noreferrer" class="btn-table-action" style="font-size: 0.82rem;">
+                                        Read Original &#8599;
+                                    </a>
+                                    {% else %}
+                                    <span></span>
+                                    {% endif %}
+
+                                    {% if current_user.role in ['admin', 'analyst'] %}
+                                    <button type="button" class="btn-table-action" style="font-size: 0.82rem; cursor: pointer;"
+                                            onclick="extractNewsIOCs({{ article.id }}, this)">
+                                        Extract IOCs
+                                    </button>
+                                    {% endif %}
+                                </div>
+
+                                <!-- Inline IOC Extraction Feedback Container -->
+                                <div id="ioc-result-{{ article.id }}" style="display: none; margin-top: 0.75rem; padding: 0.5rem 0.75rem; background: rgba(15, 23, 42, 0.8); border-radius: 4px; border: 1px solid rgba(255,255,255,0.06); font-size: 0.82rem;">
+                                </div>
+
+                            </article>
+                            {% endfor %}
+                        </div>
+
+                        <!-- Pagination Navigation -->
+                        {% if pagination.pages > 1 %}
+                        <nav class="pagination-nav" aria-label="Threat News Pagination" style="margin-top: 2rem;">
+                            <ul class="pagination-list">
+                                
+                                {% if pagination.has_prev %}
+                                <li>
+                                    <a href="{{ url_for('dashboard.threat_news', page=pagination.prev_num, query=query, category=current_category, source=current_source, severity=current_severity) }}"
+                                       class="pagination-item">&laquo; Previous</a>
+                                </li>
+                                {% else %}
+                                <li><span class="pagination-item disabled-item">&laquo; Previous</span></li>
+                                {% endif %}
+
+                                {% for p in pagination.iter_pages(left_edge=2, left_current=2, right_current=2, right_edge=2) %}
+                                    {% if p %}
+                                        {% if p == pagination.page %}
+                                        <li><span class="pagination-item current-item" aria-current="page">{{ p }}</span></li>
+                                        {% else %}
+                                        <li>
+                                            <a href="{{ url_for('dashboard.threat_news', page=p, query=query, category=current_category, source=current_source, severity=current_severity) }}"
+                                               class="pagination-item">{{ p }}</a>
+                                        </li>
+                                        {% endif %}
+                                    {% else %}
+                                    <li><span class="pagination-ellipsis">...</span></li>
+                                    {% endif %}
+                                {% endfor %}
+
+                                {% if pagination.has_next %}
+                                <li>
+                                    <a href="{{ url_for('dashboard.threat_news', page=pagination.next_num, query=query, category=current_category, source=current_source, severity=current_severity) }}"
+                                       class="pagination-item">Next &raquo;</a>
+                                </li>
+                                {% else %}
+                                <li><span class="pagination-item disabled-item">Next &raquo;</span></li>
+                                {% endif %}
+
+                            </ul>
+                        </nav>
+                        {% endif %}
+
+                    {% else %}
+                        <!-- Empty State Container -->
+                        <div class="empty-state-card" style="text-align: center; padding: 3.5rem 2rem; background: rgba(17, 24, 39, 0.6); border: 1px dashed rgba(255,255,255,0.15); border-radius: 8px;">
+                            <div style="font-size: 2.5rem; margin-bottom: 1rem;">&#128240;</div>
+                            <h2 style="color: #f8fafc; font-size: 1.25rem; margin-bottom: 0.5rem;">No Threat News Found</h2>
+                            <p style="color: #94a3b8; max-width: 480px; margin: 0 auto 1.5rem auto; font-size: 0.95rem;">
+                                {% if query or current_category != 'all' or current_source != 'all' or current_severity != 'all' %}
+                                    No articles match the current filter criteria. Try adjusting keywords or clearing filters.
+                                {% else %}
+                                    The threat news repository is currently empty. Fetch intelligence articles from configured sources to populate the feed.
+                                {% endif %}
+                            </p>
+
+                            <div style="display: flex; gap: 0.75rem; justify-content: center; flex-wrap: wrap;">
+                                {% if query or current_category != 'all' or current_source != 'all' or current_severity != 'all' %}
+                                    <a href="{{ url_for('dashboard.threat_news') }}" class="btn btn-secondary">Clear All Filters</a>
+                                {% endif %}
+
+                                {% if current_user.role in ['admin', 'analyst'] %}
+                                    <form action="{{ url_for('dashboard.refresh_threat_news') }}" method="POST" style="display: inline-block;">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn btn-primary">&#8635; Fetch Threat News</button>
+                                    </form>
+                                {% endif %}
+                            </div>
+                        </div>
+                    {% endif %}
+                </div>
+
+            </section>
+
+        </main>
+    </div>
+
+    <!-- Global Platform Footer -->
+    <footer class="main-footer">
+        <div class="footer-content">
+            <p class="copyright-text">&copy; 2026 Threat Intelligence Platform. All Rights Reserved. Securing Assets Globally.</p>
+            <nav class="footer-links" aria-label="Legal Links">
+                <a href="#" class="footer-link">Privacy Policy</a>
+                <span class="separator">|</span>
+                <a href="#" class="footer-link">Terms of Service</a>
+                <span class="separator">|</span>
+                <a href="#" class="footer-link">Security Audit Logs</a>
+            </nav>
+        </div>
+    </footer>
+
+    <!-- Interactive Script for Refreshing and IOC Extraction -->
+    <script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const refreshForm = document.getElementById('refresh-news-form');
+        const refreshBtn = document.getElementById('refresh-btn');
+        const refreshText = document.getElementById('refresh-text');
+        const refreshIcon = document.getElementById('refresh-icon');
+
+        if (refreshForm && refreshBtn) {
+            refreshForm.addEventListener('submit', function () {
+                refreshBtn.disabled = true;
+                if (refreshText) refreshText.textContent = 'Fetching Feeds...';
+                if (refreshIcon) refreshIcon.style.animation = 'spin 1s linear infinite';
+            });
+        }
+    });
+
+    function extractNewsIOCs(newsId, btnElement) {
+        const container = document.getElementById('ioc-result-' + newsId);
+        if (!container) return;
+
+        btnElement.disabled = true;
+        btnElement.textContent = 'Extracting...';
+        container.style.display = 'block';
+        container.innerHTML = '<span style="color: #94a3b8;">Analyzing article text for Indicators of Compromise...</span>';
+
+        fetch('/threat-news/' + newsId + '/extract-iocs', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+            }
+        })
+        .then(res => res.json())
+        .then(res => {
+            btnElement.disabled = false;
+            btnElement.textContent = 'Extract IOCs';
+
+            if (!res.success) {
+                container.innerHTML = '<span style="color: #ef4444;">Extraction notice: ' + (res.error || 'Failed to extract IOCs') + '</span>';
+                return;
+            }
+
+            if (res.total_extracted === 0) {
+                container.innerHTML = '<span style="color: #94a3b8;">No IP addresses, domains, URLs, or hashes detected in this article narrative.</span>';
+                return;
+            }
+
+            let html = '<div style="color: #38bdf8; font-weight: 600; margin-bottom: 4px;">' +
+                       'Extracted ' + res.total_extracted + ' IOCs (' + res.created + ' new, ' + res.reused + ' existing)</div>';
+            html += '<div style="display: flex; flex-direction: column; gap: 4px;">';
+            res.indicators.forEach(ioc => {
+                const badgeClass = ioc.is_new ? 'badge-success' : 'badge-info';
+                html += '<div><code>' + ioc.value + '</code> <span class="badge ' + badgeClass + '" style="font-size: 0.72rem; padding: 1px 6px;">' +
+                        ioc.type + '</span> <span style="color: #94a3b8; font-size: 0.75rem;">(' + (ioc.is_new ? 'Created' : 'Corroborated') + ')</span></div>';
+            });
+            html += '</div>';
+            container.innerHTML = html;
+        })
+        .catch(err => {
+            btnElement.disabled = false;
+            btnElement.textContent = 'Extract IOCs';
+            container.innerHTML = '<span style="color: #ef4444;">Request error: ' + err.message + '</span>';
+        });
+    }
+    </script>
+
+</body>
+
+</html>

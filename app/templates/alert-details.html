@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Security Alert Details & Incident Investigation">
+    <title>Alert #{{ alert.id }} - Threat Intelligence Platform</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="{{ url_for('static', filename='js/1-funtioning.js') }}" defer></script>
+</head>
+<body class="dashboard-page">
+
+    <!-- Top Navigation Header -->
+    <header class="main-header">
+        <nav class="navbar dashboard-navbar" aria-label="Main Navigation">
+            <div class="navbar-brand">
+                <a href="{{ url_for('main.home') }}" class="logo-link">
+                    <span class="logo-icon">&#128737;</span>
+                    <span class="logo-text">ThreatIntel Platform</span>
+                </a>
+            </div>
+
+            <!-- Global Quick Search -->
+            <div class="navbar-search">
+                <form action="{{ url_for('dashboard.search_threats') }}" method="GET" class="search-form">
+                    <label for="global-search" class="visually-hidden">Search threats, IPs, hashes</label>
+                    <input type="search" id="global-search" name="query" class="search-input" placeholder="Search threats, IPs, CVEs...">
+                    <button type="submit" class="search-button">Search</button>
+                </form>
+            </div>
+
+            <div class="navbar-user-menu">
+                <span class="user-role badge-critical">{{ current_user.role|capitalize if current_user.is_authenticated else 'Analyst' }}</span>
+                <a href="{{ url_for('dashboard.profile') }}" class="user-profile-link">Profile Settings</a>
+                <a href="{{ url_for('auth.logout') if 'auth.logout' in url_for.__globals__ else url_for('auth.login') }}" class="logout-link">Sign Out</a>
+            </div>
+        </nav>
+    </header>
+
+    <div class="layout-container">
+        
+        <!-- Left Sidebar Navigation -->
+        <aside class="sidebar" aria-label="Sidebar Navigation">
+            <nav class="sidebar-navigation">
+                <ul class="sidebar-menu">
+                    <li><a href="{{ url_for('dashboard.dashboard') }}" class="menu-item">Dashboard Overview</a></li>
+                    <li><a href="{{ url_for('dashboard.threat_feed') }}" class="menu-item">Live Threat Feed</a></li>
+                    <li><a href="{{ url_for('dashboard.ip_checker') }}" class="menu-item">IP Address Checker</a></li>
+                    <li><a href="{{ url_for('dashboard.malware_info') }}" class="menu-item">Malware Information</a></li>
+                    <li><a href="{{ url_for('dashboard.threat_report_upload') }}" class="menu-item">Upload Threat Report</a></li>
+                    <li><a href="{{ url_for('dashboard.search_threats') }}" class="menu-item">Search Threats Database</a></li>
+                    <li><a href="{{ url_for('dashboard.alerts') }}" class="menu-item active-menu-item">Alerts & Notifications</a></li>
+                    <li><a href="{{ url_for('admin.admin') }}" class="menu-item">System Admin Panel</a></li>
+                </ul>
+            </nav>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="dashboard-main-content">
+            
+            <section class="alert-details-section">
+                
+                <!-- Breadcrumbs & Back Link -->
+                <div style="margin-bottom: 1.5rem;">
+                    <a href="{{ url_for('dashboard.alerts') }}" style="color: #38bdf8; text-decoration: none; font-size: 0.95rem;">
+                        &larr; Back to Security Alert Center
+                    </a>
+                </div>
+
+                <!-- Flash Messages -->
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        <div class="flash-messages-container" style="margin-bottom: 1.5rem;">
+                            {% for category, message in messages %}
+                                <div class="alert-card {% if category == 'success' %}info-alert-border{% elif category == 'warning' %}warning-alert-border{% else %}critical-alert-border{% endif %}" style="padding: 0.75rem 1.25rem; margin-bottom: 0.5rem;">
+                                    {{ message }}
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                {% endwith %}
+
+                <!-- Alert Overview Header Card -->
+                <article class="alert-card {% if alert.severity == 'Critical' %}critical-alert-border{% elif alert.severity == 'High' %}warning-alert-border{% else %}info-alert-border{% endif %}" style="margin-bottom: 2rem;">
+                    <header class="alert-card-header" style="border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 1rem; margin-bottom: 1.25rem;">
+                        <div>
+                            <span style="color: #94a3b8; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em;">Incident Reference #AL-{{ alert.id }}</span>
+                            <h1 style="font-size: 1.5rem; margin: 0.25rem 0 0 0; color: #f8fafc;">{{ alert.title }}</h1>
+                        </div>
+                        <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                            {% if alert.severity == 'Critical' %}
+                            <span class="badge badge-critical" style="font-size: 0.9rem; padding: 4px 10px;">Critical Severity</span>
+                            {% elif alert.severity == 'High' %}
+                            <span class="badge badge-warning" style="font-size: 0.9rem; padding: 4px 10px;">High Severity</span>
+                            {% elif alert.severity == 'Medium' %}
+                            <span class="badge badge-info" style="font-size: 0.9rem; padding: 4px 10px;">Medium Severity</span>
+                            {% else %}
+                            <span class="badge badge-success" style="font-size: 0.9rem; padding: 4px 10px;">Low Severity</span>
+                            {% endif %}
+
+                            {% if alert.alert_type == 'EDR' %}
+                            <span class="badge" style="background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.4); font-size: 0.85rem;">&#128737; EDR Sensor</span>
+                            {% elif alert.alert_type == 'SIEM/EDR' %}
+                            <span class="badge" style="background: rgba(6, 182, 212, 0.2); color: #22d3ee; border: 1px solid rgba(6, 182, 212, 0.4); font-size: 0.85rem;">&#9889; SIEM Webhook</span>
+                            {% else %}
+                            <span class="badge badge-secondary" style="font-size: 0.85rem;">{{ alert.alert_type }}</span>
+                            {% endif %}
+
+                            {% if alert.status == 'Open' %}
+                            <span class="badge badge-critical" style="font-size: 0.85rem;">Status: Open</span>
+                            {% elif alert.status == 'In Progress' %}
+                            <span class="badge badge-warning" style="font-size: 0.85rem;">Status: In Progress</span>
+                            {% elif alert.status == 'Resolved' %}
+                            <span class="badge badge-success" style="font-size: 0.85rem;">Status: Resolved</span>
+                            {% else %}
+                            <span class="badge badge-secondary" style="font-size: 0.85rem;">Status: Closed</span>
+                            {% endif %}
+                        </div>
+                    </header>
+
+                    <!-- Alert Metadata Grid -->
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.25rem; margin-bottom: 1.5rem;">
+                        <div>
+                            <strong style="color: #94a3b8; font-size: 0.85rem; display: block;">Created Timestamp</strong>
+                            <span style="color: #e2e8f0; font-size: 0.95rem;">{{ alert.created_at.strftime('%Y-%m-%d %H:%M:%S UTC') if alert.created_at else 'N/A' }}</span>
+                        </div>
+                        <div>
+                            <strong style="color: #94a3b8; font-size: 0.85rem; display: block;">Last Updated</strong>
+                            <span style="color: #e2e8f0; font-size: 0.95rem;">{{ alert.updated_at.strftime('%Y-%m-%d %H:%M:%S UTC') if alert.updated_at else 'N/A' }}</span>
+                        </div>
+                        <div>
+                            <strong style="color: #94a3b8; font-size: 0.85rem; display: block;">Assigned Analyst</strong>
+                            <span style="color: #e2e8f0; font-size: 0.95rem;">{{ alert.user.username if alert.user else 'Unassigned' }}</span>
+                        </div>
+                        <div>
+                            <strong style="color: #94a3b8; font-size: 0.85rem; display: block;">Read State</strong>
+                            <span style="color: #e2e8f0; font-size: 0.95rem;">{{ 'Read' if alert.is_read else 'Unread' }}</span>
+                        </div>
+                    </div>
+
+                    <!-- Alert Description -->
+                    {% if alert.description %}
+                    <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255,255,255,0.06); border-radius: 6px; padding: 1.25rem; margin-bottom: 1.5rem;">
+                        <strong style="color: #38bdf8; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 0.5rem;">Incident Context & Description</strong>
+                        <p style="color: #cbd5e1; font-size: 0.95rem; line-height: 1.6; margin: 0; white-space: pre-line; font-family: monospace;">{{ alert.description }}</p>
+                    </div>
+                    {% endif %}
+
+                    <!-- Lifecycle Action Buttons -->
+                    <footer class="alert-card-footer" style="display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center;">
+                        
+                        {% if alert.status == 'Open' %}
+                        <form action="{{ url_for('dashboard.alert_acknowledge_route', alert_id=alert.id) }}" method="POST">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-action btn-warning">Acknowledge Alert</button>
+                        </form>
+                        {% endif %}
+
+                        {% if alert.status in ['Open', 'In Progress'] %}
+                        <form action="{{ url_for('dashboard.alert_resolve_route', alert_id=alert.id) }}" method="POST">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-action btn-success">Mark Resolved</button>
+                        </form>
+                        {% endif %}
+
+                        {% if alert.status in ['Resolved', 'Closed'] %}
+                        <form action="{{ url_for('dashboard.alert_reopen_route', alert_id=alert.id) }}" method="POST">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-action btn-primary">Reopen Alert</button>
+                        </form>
+                        {% endif %}
+
+                        <a href="{{ url_for('dashboard.alerts') }}" class="btn btn-action btn-secondary" style="margin-left: auto;">
+                            Return to Alert Center
+                        </a>
+                    </footer>
+                </article>
+
+                <!-- Linked Threat Indicator Intelligence Section -->
+                {% if alert.indicator %}
+                <article class="alert-card" style="margin-bottom: 2rem;">
+                    <header class="alert-card-header" style="margin-bottom: 1rem;">
+                        <h2 style="font-size: 1.15rem; color: #38bdf8; margin: 0;">Connected Indicator of Compromise (IOC)</h2>
+                        <span class="badge badge-info">{{ alert.indicator.indicator_type }}</span>
+                    </header>
+
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1rem;">
+                        <div>
+                            <strong style="color: #94a3b8; font-size: 0.85rem; display: block;">Indicator Value</strong>
+                            <code>{{ alert.indicator.indicator_value }}</code>
+                        </div>
+                        <div>
+                            <strong style="color: #94a3b8; font-size: 0.85rem; display: block;">Indicator Severity</strong>
+                            <span>{{ alert.indicator.severity }}</span>
+                        </div>
+                        <div>
+                            <strong style="color: #94a3b8; font-size: 0.85rem; display: block;">Analyst Confidence</strong>
+                            <span>{{ alert.indicator.confidence_score }}%</span>
+                        </div>
+                        <div>
+                            <strong style="color: #94a3b8; font-size: 0.85rem; display: block;">Calculated Risk Score</strong>
+                            {% if indicator_risk and indicator_risk.success %}
+                            <span style="font-size: 1.1rem; font-weight: bold; color: #38bdf8;">{{ indicator_risk.risk_score }}/100</span>
+                            <span class="badge {% if indicator_risk.risk_level == 'CRITICAL' %}badge-critical{% elif indicator_risk.risk_level == 'HIGH' %}badge-warning{% elif indicator_risk.risk_level == 'MEDIUM' %}badge-info{% else %}badge-success{% endif %}" style="font-size: 0.75rem;">
+                                {{ indicator_risk.risk_level }}
+                            </span>
+                            {% elif alert.indicator.risk_score is not none %}
+                            <span style="font-size: 1.1rem; font-weight: bold; color: #38bdf8;">{{ alert.indicator.risk_score }}/100</span>
+                            {% else %}
+                            <span style="color: #64748b;">Not yet evaluated</span>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div style="display: flex; gap: 0.75rem; margin-top: 1rem;">
+                        {% if alert.indicator.indicator_type|lower in ['ip', 'ipv4'] %}
+                        <a href="{{ url_for('dashboard.ip_checker', ip=alert.indicator.indicator_value) }}" class="btn btn-action btn-secondary">
+                            Run IP Reputation Check
+                        </a>
+                        {% endif %}
+                        <a href="{{ url_for('dashboard.search_threats', query=alert.indicator.indicator_value) }}" class="btn btn-action btn-secondary">
+                            Search Platform Intelligence
+                        </a>
+                    </div>
+                </article>
+                {% endif %}
+
+                <!-- Linked Malware Intelligence Section -->
+                {% if alert.malware %}
+                <article class="alert-card" style="margin-bottom: 2rem;">
+                    <header class="alert-card-header" style="margin-bottom: 1rem;">
+                        <h2 style="font-size: 1.15rem; color: #f59e0b; margin: 0;">Associated Malware Signature</h2>
+                        <span class="badge badge-warning">{{ alert.malware.malware_type }}</span>
+                    </header>
+
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+                        <div>
+                            <strong style="color: #94a3b8; font-size: 0.85rem; display: block;">Malware Name</strong>
+                            <strong>{{ alert.malware.malware_name }}</strong>
+                        </div>
+                        <div>
+                            <strong style="color: #94a3b8; font-size: 0.85rem; display: block;">Platform</strong>
+                            <span>{{ alert.malware.platform }}</span>
+                        </div>
+                        <div>
+                            <strong style="color: #94a3b8; font-size: 0.85rem; display: block;">Severity</strong>
+                            <span>{{ alert.malware.severity }}</span>
+                        </div>
+                        <div>
+                            <strong style="color: #94a3b8; font-size: 0.85rem; display: block;">Risk Score</strong>
+                            <span>{{ alert.malware.risk_score }}/100</span>
+                        </div>
+                    </div>
+
+                    {% if alert.malware.description %}
+                    <p style="color: #cbd5e1; margin-top: 1rem; font-size: 0.9rem;">
+                        {{ alert.malware.description }}
+                    </p>
+                    {% endif %}
+                </article>
+                {% endif %}
+
+            </section>
+
+        </main>
+    </div>
+
+    <!-- Global Platform Footer -->
+    <footer class="main-footer">
+        <div class="footer-content">
+            <p class="copyright-text">&copy; 2026 Threat Intelligence Platform. All Rights Reserved. Securing Assets Globally.</p>
+            <nav class="footer-links" aria-label="Legal Links">
+                <a href="#" class="footer-link">Privacy Policy</a>
+                <span class="separator">|</span>
+                <a href="#" class="footer-link">Terms of Service</a>
+                <span class="separator">|</span>
+                <a href="#" class="footer-link">Security Audit Logs</a>
+            </nav>
+        </div>
+    </footer>
+
+</body>
+</html>

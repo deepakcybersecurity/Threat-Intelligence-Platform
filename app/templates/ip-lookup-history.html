@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <meta name="description"
+          content="IP Reputation Lookup History - Threat Intelligence Platform">
+
+    <title>IP Lookup History | Threat Intelligence Platform</title>
+
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='css/style.css') }}">
+
+    <script
+        src="{{ url_for('static', filename='js/1-funtioning.js') }}"
+        defer>
+    </script>
+
+</head>
+
+
+<body class="dashboard-page">
+
+
+<!-- ==========================================================
+     TOP NAVBAR
+=========================================================== -->
+
+<header class="main-header">
+
+    <nav class="navbar dashboard-navbar">
+
+        <div class="navbar-brand">
+
+            <a href="{{ url_for('main.home') }}"
+               class="logo-link">
+
+                <span class="logo-icon">🛡</span>
+
+                <span class="logo-text">
+                    ThreatIntel Platform
+                </span>
+
+            </a>
+
+        </div>
+
+
+        <!-- Global Search -->
+
+        <div class="navbar-search">
+
+            <form
+                action="{{ url_for('dashboard.search_threats') }}"
+                method="GET"
+                class="search-form"
+            >
+
+                <input
+                    type="search"
+                    name="query"
+                    class="search-input"
+                    placeholder="Search Threats, CVEs, Reports..."
+                >
+
+                <button
+                    type="submit"
+                    class="search-button"
+                >
+                    Search
+                </button>
+
+            </form>
+
+        </div>
+
+
+        <!-- User Menu -->
+
+        <div class="navbar-user-menu">
+
+            <span class="user-role badge-critical">
+
+                {{ current_user.role|capitalize }}
+
+            </span>
+
+
+            <a
+                href="{{ url_for('dashboard.profile') }}"
+                class="user-profile-link"
+            >
+                Profile
+            </a>
+
+
+            <div class="user-actions">
+
+                <span class="user-name">
+
+                    Welcome,
+                    {{ current_user.username }}
+
+                </span>
+
+
+                <a
+                    href="{{ url_for('auth.logout') }}"
+                    class="logout-link"
+                >
+                    Logout
+                </a>
+
+            </div>
+
+        </div>
+
+    </nav>
+
+</header>
+
+
+
+<!-- ==========================================================
+     MAIN LAYOUT
+=========================================================== -->
+
+<div class="layout-container">
+
+
+    <!-- ======================================================
+         SIDEBAR
+    ======================================================= -->
+
+    <aside class="sidebar">
+
+        <nav class="sidebar-navigation">
+
+            <ul class="sidebar-menu">
+
+
+                <li>
+
+                    <a
+                        href="{{ url_for('dashboard.dashboard') }}"
+                        class="menu-item"
+                    >
+                        Dashboard Overview
+                    </a>
+
+                </li>
+
+
+                <li>
+
+                    <a
+                        href="{{ url_for('dashboard.threat_feed') }}"
+                        class="menu-item"
+                    >
+                        Live Threat Feed
+                    </a>
+
+                </li>
+
+
+                <li>
+
+                    <a
+                        href="{{ url_for('dashboard.ip_checker') }}"
+                        class="menu-item"
+                    >
+                        IP Address Checker
+                    </a>
+
+                </li>
+
+
+                <li>
+
+                    <a
+                        href="{{ url_for('dashboard.malware_info') }}"
+                        class="menu-item"
+                    >
+                        Malware Information
+                    </a>
+
+                </li>
+
+
+                <li>
+
+                    <a
+                        href="{{ url_for('dashboard.threat_report_upload') }}"
+                        class="menu-item"
+                    >
+                        Upload Threat Report
+                    </a>
+
+                </li>
+
+
+                <li>
+
+                    <a
+                        href="{{ url_for('dashboard.search_threats') }}"
+                        class="menu-item"
+                    >
+                        Search Threats Database
+                    </a>
+
+                </li>
+
+
+                <!-- ACTIVE PAGE -->
+
+                <li>
+
+                    <a
+                        href="{{ url_for('dashboard.ip_lookup_history') }}"
+                        class="menu-item active-menu-item"
+                    >
+                        IP Lookup History
+                    </a>
+
+                </li>
+
+
+                <li>
+
+                    <a
+                        href="{{ url_for('dashboard.alerts') }}"
+                        class="menu-item"
+                    >
+                        Alerts & Notifications
+                    </a>
+
+                </li>
+
+
+                <li>
+
+                    <a
+                        href="{{ url_for('admin.admin') }}"
+                        class="menu-item"
+                    >
+                        System Admin Panel
+                    </a>
+
+                </li>
+
+
+            </ul>
+
+        </nav>
+
+    </aside>
+
+
+
+    <!-- ======================================================
+         MAIN CONTENT
+    ======================================================= -->
+
+    <main class="dashboard-main-content">
+
+
+        <!-- PAGE HEADER -->
+
+        <section class="dashboard-overview">
+
+            <header class="section-header">
+
+                <div>
+
+                    <h1 class="page-title">
+                        IP Reputation Lookup History
+                    </h1>
+
+                    <p class="page-subtitle">
+
+                        Review previously analyzed IP addresses,
+                        reputation results and lookup activity.
+
+                    </p>
+
+                </div>
+
+
+                <div>
+
+                    <a
+                        href="{{ url_for('dashboard.ip_checker') }}"
+                        class="btn btn-primary"
+                    >
+                        + Check New IP
+                    </a>
+
+                </div>
+
+            </header>
+
+
+
+            <!-- ==================================================
+                 STATISTICS
+            =================================================== -->
+
+            <div class="dashboard-cards-grid">
+
+
+                <!-- Total Lookups -->
+
+                <article class="dashboard-card status-info">
+
+                    <header class="card-header">
+
+                        <h2 class="card-title">
+                            Total Lookups
+                        </h2>
+
+                        <span class="card-icon">
+                            🔎
+                        </span>
+
+                    </header>
+
+
+                    <p class="card-value">
+
+                        {{ history|length }}
+
+                    </p>
+
+
+                    <footer class="card-footer">
+
+                        All IP reputation queries
+
+                    </footer>
+
+                </article>
+
+
+
+                <!-- Unique IPs -->
+
+                <article class="dashboard-card status-success">
+
+                    <header class="card-header">
+
+                        <h2 class="card-title">
+                            Unique IPs
+                        </h2>
+
+                        <span class="card-icon">
+                            🌐
+                        </span>
+
+                    </header>
+
+
+                    <p class="card-value">
+
+                        {{ history|map(attribute='ip_address')|unique|list|length }}
+
+                    </p>
+
+
+                    <footer class="card-footer">
+
+                        Distinct IP addresses analyzed
+
+                    </footer>
+
+                </article>
+
+
+
+                <!-- Latest Lookup -->
+
+                <article class="dashboard-card status-warning">
+
+                    <header class="card-header">
+
+                        <h2 class="card-title">
+                            Latest Lookup
+                        </h2>
+
+                        <span class="card-icon">
+                            🕒
+                        </span>
+
+                    </header>
+
+
+                    <p class="card-value"
+                       style="font-size: 1.2rem;">
+
+                        {% if history %}
+
+                            {{ history[0].display_lookup_time.strftime("%d %b %Y") }}
+
+                        {% else %}
+
+                            --
+
+                        {% endif %}
+
+                    </p>
+
+
+                    <footer class="card-footer">
+
+                        Most recent reputation check
+
+                    </footer>
+
+                </article>
+
+
+            </div>
+
+        </section>
+
+
+
+        <!-- ==================================================
+             SEARCH / FILTER
+        =================================================== -->
+
+        <section class="recent-activity-section">
+
+            <header class="section-header">
+
+                <div>
+
+                    <h2 class="section-title">
+                        Lookup History
+                    </h2>
+
+                    <p class="page-subtitle">
+                        Search and review your previous IP reputation lookups.
+                    </p>
+
+                </div>
+
+            </header>
+
+
+            <form class="search-form-block">
+
+                <div class="form-grid">
+
+                    <div class="form-group">
+
+                        <label>
+                            Search IP Address
+                        </label>
+
+                        <input
+                            type="text"
+                            class="form-control search-input"
+                            placeholder="Search IP address..."
+                        >
+
+                    </div>
+
+
+                    <div class="form-group">
+
+                        <label>
+                            Country
+                        </label>
+
+                        <select class="form-select">
+
+                            <option value="">
+                                All Countries
+                            </option>
+
+                            {% for record in history %}
+
+                                {% if record.country %}
+
+                                    <option value="{{ record.country }}">
+                                        {{ record.country }}
+                                    </option>
+
+                                {% endif %}
+
+                            {% endfor %}
+
+                        </select>
+
+                    </div>
+
+
+                    <div class="form-group">
+
+                        <label>
+                            Action
+                        </label>
+
+                        <div>
+
+                            <a
+                                href="{{ url_for('dashboard.ip_lookup_history') }}"
+                                class="btn btn-secondary"
+                            >
+                                Clear
+                            </a>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </form>
+
+
+
+            <!-- ==================================================
+                 TABLE
+            =================================================== -->
+
+            <table class="data-table">
+
+                <caption>
+                    Historical IP reputation lookup activity
+                </caption>
+
+
+                <thead>
+
+                    <tr>
+
+                        <th scope="col">
+                            #
+                        </th>
+
+                        <th scope="col">
+                            IP Address
+                        </th>
+
+                        <th scope="col">
+                            Country
+                        </th>
+
+                        <th scope="col">
+                            City
+                        </th>
+
+                        <th scope="col">
+                            ISP
+                        </th>
+
+                        <th scope="col">
+                            Organization
+                        </th>
+
+                        <th scope="col">
+                            Lookup Time
+                        </th>
+
+                        <th scope="col">
+                            Action
+                        </th>
+
+                    </tr>
+
+                </thead>
+
+
+                <tbody>
+
+
+                    {% if history %}
+
+
+                        {% for record in history %}
+
+                        <tr>
+
+                            <td>
+                                {{ loop.index }}
+                            </td>
+
+
+                            <td>
+
+                                <code>
+                                    {{ record.ip_address }}
+                                </code>
+
+                            </td>
+
+
+                            <td>
+
+                                {% if record.country %}
+
+                                    <span class="badge badge-info">
+                                        {{ record.country }}
+                                    </span>
+
+                                {% else %}
+
+                                    --
+
+                                {% endif %}
+
+                            </td>
+
+
+                            <td>
+
+                                {{ record.city or "--" }}
+
+                            </td>
+
+
+                            <td>
+
+                                {{ record.isp or "--" }}
+
+                            </td>
+
+
+                            <td>
+
+                                {{ record.organization or "--" }}
+
+                            </td>
+
+
+                            <td>
+
+                                <strong>
+
+                                    {{ record.display_lookup_time.strftime("%d %b %Y") }}
+
+                                </strong>
+
+                                <br>
+
+                                <small>
+
+                                    {{ record.display_lookup_time.strftime("%I:%M %p") }}
+                                    IST
+
+                                </small>
+
+                            </td>
+
+
+                            <td>
+
+                                <a
+                                    href="{{ url_for('dashboard.ip_checker') }}"
+                                    class="btn btn-secondary"
+                                >
+                                    Check Again
+                                </a>
+
+                            </td>
+
+                        </tr>
+
+                        {% endfor %}
+
+
+                    {% else %}
+
+
+                        <tr>
+
+                            <td
+                                colspan="8"
+                                style="text-align:center; padding:40px;"
+                            >
+
+                                <h3>
+                                    No IP Lookup History Found
+                                </h3>
+
+                                <p>
+                                    Perform your first IP reputation lookup.
+                                </p>
+
+                                <a
+                                    href="{{ url_for('dashboard.ip_checker') }}"
+                                    class="btn btn-primary"
+                                >
+                                    Check IP Reputation
+                                </a>
+
+                            </td>
+
+                        </tr>
+
+
+                    {% endif %}
+
+
+                </tbody>
+
+            </table>
+
+        </section>
+
+
+
+        <!-- ==================================================
+             QUICK ACTIONS
+        =================================================== -->
+
+        <section class="notification-section">
+
+            <header class="section-header">
+
+                <h2 class="section-title">
+                    Quick Actions
+                </h2>
+
+            </header>
+
+
+            <div class="dashboard-cards-grid">
+
+
+                <article class="dashboard-card status-info">
+
+                    <header class="card-header">
+
+                        <h3 class="card-title">
+                            Check New IP
+                        </h3>
+
+                        <span class="card-icon">
+                            🌐
+                        </span>
+
+                    </header>
+
+
+                    <p>
+                        Analyze an IP address using AbuseIPDB threat intelligence.
+                    </p>
+
+
+                    <footer class="card-footer">
+
+                        <a
+                            href="{{ url_for('dashboard.ip_checker') }}"
+                            class="card-link"
+                        >
+                            Start Lookup →
+                        </a>
+
+                    </footer>
+
+                </article>
+
+
+
+                <article class="dashboard-card status-success">
+
+                    <header class="card-header">
+
+                        <h3 class="card-title">
+                            Threat Feed
+                        </h3>
+
+                        <span class="card-icon">
+                            🌍
+                        </span>
+
+                    </header>
+
+
+                    <p>
+                        Explore current indicators of compromise.
+                    </p>
+
+
+                    <footer class="card-footer">
+
+                        <a
+                            href="{{ url_for('dashboard.threat_feed') }}"
+                            class="card-link"
+                        >
+                            Explore Feed →
+                        </a>
+
+                    </footer>
+
+                </article>
+
+
+
+                <article class="dashboard-card status-warning">
+
+                    <header class="card-header">
+
+                        <h3 class="card-title">
+                            Threat Reports
+                        </h3>
+
+                        <span class="card-icon">
+                            📄
+                        </span>
+
+                    </header>
+
+
+                    <p>
+                        Review uploaded threat intelligence reports.
+                    </p>
+
+
+                    <footer class="card-footer">
+
+                        <a
+                            href="{{ url_for('dashboard.threat_reports') }}"
+                            class="card-link"
+                        >
+                            View Reports →
+                        </a>
+
+                    </footer>
+
+                </article>
+
+
+
+                <article class="dashboard-card status-critical">
+
+                    <header class="card-header">
+
+                        <h3 class="card-title">
+                            Alerts
+                        </h3>
+
+                        <span class="card-icon">
+                            🚨
+                        </span>
+
+                    </header>
+
+
+                    <p>
+                        Review active security alerts generated by the platform.
+                    </p>
+
+
+                    <footer class="card-footer">
+
+                        <a
+                            href="{{ url_for('dashboard.alerts') }}"
+                            class="card-link"
+                        >
+                            View Alerts →
+                        </a>
+
+                    </footer>
+
+                </article>
+
+
+            </div>
+
+        </section>
+
+
+    </main>
+
+</div>
+
+
+
+<!-- ==========================================================
+     FOOTER
+=========================================================== -->
+
+<footer class="main-footer">
+
+    <div class="footer-content">
+
+        <p>
+
+            &copy; 2026 Threat Intelligence Platform.
+            All Rights Reserved.
+
+        </p>
+
+
+        <nav class="footer-links">
+
+            <a href="#">
+                Privacy Policy
+            </a>
+
+            <span>|</span>
+
+            <a href="#">
+                Terms of Service
+            </a>
+
+            <span>|</span>
+
+            <a href="#">
+                Security Logs
+            </a>
+
+        </nav>
+
+    </div>
+
+</footer>
+
+
+</body>
+
+</html>

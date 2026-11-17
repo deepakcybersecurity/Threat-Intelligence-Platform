@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description"
+        content="Threat Intelligence Platform Security Dashboard. Real-time metrics on global threats, active system alerts, blocked IPs, and malware reports.">
+    <title>Security Dashboard - Threat Intelligence Platform</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="{{ url_for('static', filename='js/1-funtioning.js') }}" defer></script>
+</head>
+
+<body class="dashboard-page">
+
+    <!-- Top Navigation Header -->
+    <header class="main-header">
+        <nav class="navbar dashboard-navbar" aria-label="Main Navigation">
+            <div class="navbar-brand">
+                <a href="{{ url_for('main.home') }}" class="logo-link">
+                    <span class="logo-icon">&#128737;</span>
+                    <span class="logo-text">ThreatIntel Platform</span>
+                </a>
+            </div>
+
+            <!-- Global Quick Search -->
+            <div class="navbar-search">
+                <form action="{{ url_for('dashboard.search_threats') }}" method="GET" class="search-form">
+                    <label for="global-search" class="visually-hidden">Search threats, IPs, hashes</label>
+                    <input type="search" id="global-search" name="query" class="search-input"
+                        placeholder="Search threats, IPs, CVEs...">
+                    <button type="submit" class="search-button">Search</button>
+                </form>
+            </div>
+
+            <div class="navbar-user-menu">
+                <span class="user-role badge-critical">SecOps Admin</span>
+                <a href="{{ url_for('dashboard.profile') }}" class="user-profile-link">Profile Settings</a>
+                <div class="user-actions">
+                    <span class="user-name">
+                        Welcome, {{ current_user.username }}
+                    </span>
+                    <a href="{{ url_for('auth.logout') }}" class="logout-link">
+                        Sign Out
+                    </a>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <div class="layout-container">
+
+        <!-- Left Sidebar Navigation -->
+        <aside class="sidebar" aria-label="Sidebar Navigation">
+            <nav class="sidebar-navigation">
+                <ul class="sidebar-menu">
+                    <li><a href="{{ url_for('dashboard.dashboard') }}" class="menu-item active-menu-item">Dashboard
+                            Overview</a></li>
+                    <li><a href="{{ url_for('dashboard.threat_feed') }}" class="menu-item">Live Threat Feed</a></li>
+                    <li><a href="{{ url_for('dashboard.threat_news') }}" class="menu-item">Threat News</a></li>
+                    <li><a href="{{ url_for('dashboard.ip_checker') }}" class="menu-item">IP Address Checker</a></li>
+                    <li><a href="{{ url_for('dashboard.malware_info') }}" class="menu-item">Malware Information</a></li>
+                    <li><a href="{{ url_for('dashboard.mitre_matrix') }}" class="menu-item">MITRE ATT&CK Matrix</a></li>
+                    <li><a href="{{ url_for('dashboard.threat_report_upload') }}" class="menu-item">Upload Threat
+                            Report</a></li>
+                    <li><a href="{{ url_for('dashboard.search_threats') }}" class="menu-item">Search Threats
+                            Database</a></li>
+                    <li><a href="{{ url_for('dashboard.alerts') }}" class="menu-item">Alerts & Notifications</a></li>
+                    <li><a href="{{ url_for('dashboard.siem_edr_integration') }}" class="menu-item">SIEM / EDR Integration</a></li>
+                    <li><a href="{{ url_for('admin.admin') }}" class="menu-item">System Admin Panel</a></li>
+                </ul>
+            </nav>
+        </aside>
+
+        <!-- Main Dashboard Viewport -->
+        <main class="dashboard-main-content">
+
+            <section class="dashboard-overview" aria-labelledby="overview-heading">
+                <header class="section-header">
+                    <h1 id="overview-heading" class="page-title">Operations Security Dashboard</h1>
+                    <p class="page-subtitle">Real-time indicators of compromise (IOCs) and system alerts overview</p>
+                </header>
+
+                <!-- Metric Cards Grid -->
+                <div class="dashboard-cards-grid">
+
+                    <!-- Users -->
+                    <article class="dashboard-card status-info">
+                        <header class="card-header">
+                            <h2 class="card-title">Registered Users</h2>
+                            <span class="card-icon">👥</span>
+                        </header>
+
+                        <p class="card-value">{{ total_users }}</p>
+
+                        <footer class="card-footer">
+                            <span class="card-link">System Accounts</span>
+                        </footer>
+                    </article>
+
+                    <!-- Threat Reports -->
+                    <article class="dashboard-card status-success">
+                        <header class="card-header">
+                            <h2 class="card-title">Threat Reports</h2>
+                            <span class="card-icon">📄</span>
+                        </header>
+
+                        <p class="card-value">{{ total_reports }}</p>
+
+                        <footer class="card-footer">
+                            <a href="{{ url_for('dashboard.threat_report_upload') }}" class="card-link">
+                                View Reports →
+                            </a>
+                        </footer>
+                    </article>
+
+                    <!-- Malware -->
+                    <article class="dashboard-card status-warning">
+                        <header class="card-header">
+                            <h2 class="card-title">Malware Database</h2>
+                            <span class="card-icon">🦠</span>
+                        </header>
+
+                        <p class="card-value">{{ total_malware }}</p>
+
+                        <footer class="card-footer">
+                            <a href="{{ url_for('dashboard.malware_info') }}" class="card-link">
+                                View Malware →
+                            </a>
+                        </footer>
+                    </article>
+
+                    <!-- Threat Indicators -->
+                    <article class="dashboard-card status-info">
+                        <header class="card-header">
+                            <h2 class="card-title">Threat Indicators</h2>
+                            <span class="card-icon">🎯</span>
+                        </header>
+
+                        <p class="card-value">{{ total_indicators }}</p>
+
+                        <footer class="card-footer">
+                            <a href="{{ url_for('dashboard.threat_feed') }}" class="card-link">
+                                Explore IOC →
+                            </a>
+                        </footer>
+                    </article>
+
+                    <!-- Alerts -->
+                    <article class="dashboard-card status-critical">
+                        <header class="card-header">
+                            <h2 class="card-title">Active Alerts</h2>
+                            <span class="card-icon">🚨</span>
+                        </header>
+
+                        <p class="card-value">{{ total_alerts }}</p>
+
+                        <footer class="card-footer">
+                            <a href="{{ url_for('dashboard.alerts') }}" class="card-link">
+                                View Alerts →
+                            </a>
+                        </footer>
+                    </article>
+
+                    <!-- Threat News -->
+                    <article class="dashboard-card status-success">
+                        <header class="card-header">
+                            <h2 class="card-title">Threat News</h2>
+                            <span class="card-icon">📰</span>
+                        </header>
+
+                        <p class="card-value">{{ total_news }}</p>
+
+                        <footer class="card-footer">
+                            <a href="{{ url_for('dashboard.threat_news') }}" class="card-link">
+                                Latest News →
+                            </a>
+                        </footer>
+                    </article>
+
+                </div>
+            </section>
+
+            <!-- Recent Activity Section -->
+            <section class="recent-activity-section" aria-labelledby="activity-heading">
+                <header class="section-header">
+                    <h2 id="activity-heading" class="section-title">Recent Threat Intelligence Logs</h2>
+                </header>
+
+                <table class="data-table">
+                    <caption>List of latest threat intelligence indicators detected on network perimeter</caption>
+                    <thead>
+                        <tr>
+                            <th scope="col">Incident ID</th>
+                            <th scope="col">Threat Indicator</th>
+                            <th scope="col">Indicator Type</th>
+                            <th scope="col">Severity Level</th>
+                            <th scope="col">Detection Source</th>
+                            <th scope="col">Current Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>TH-0921</strong></td>
+                            <td><code>198.51.100.42</code></td>
+                            <td>IP Address (C2)</td>
+                            <td><span class="badge badge-critical">Critical</span></td>
+                            <td>Honeypot-Alpha</td>
+                            <td>Investigating</td>
+                        </tr>
+                        <tr>
+                            <td><strong>TH-0920</strong></td>
+                            <td><code>wanacry_payload.exe</code></td>
+                            <td>SHA256 Hash</td>
+                            <td><span class="badge badge-critical">Critical</span></td>
+                            <td>Endpoint Agent</td>
+                            <td>Mitigated</td>
+                        </tr>
+                        <tr>
+                            <td><strong>TH-0919</strong></td>
+                            <td><code>update-service-malicious.org</code></td>
+                            <td>Domain (Phishing)</td>
+                            <td><span class="badge badge-warning">High</span></td>
+                            <td>Mail Gateway</td>
+                            <td>Blocked</td>
+                        </tr>
+                        <tr>
+                            <td><strong>TH-0918</strong></td>
+                            <td><code>192.0.2.145</code></td>
+                            <td>IP Address (Scanner)</td>
+                            <td><span class="badge badge-info">Medium</span></td>
+                            <td>Firewall Syslog</td>
+                            <td>Monitored</td>
+                        </tr>
+                        <tr>
+                            <td><strong>TH-0917</strong></td>
+                            <td><code>powershell.exe -enc...</code></td>
+                            <td>Process Execution</td>
+                            <td><span class="badge badge-warning">High</span></td>
+                            <td>SIEM Logs</td>
+                            <td>Active Case</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </section>
+
+            <!-- Notifications & Alert Feed -->
+            <section class="notification-section" aria-labelledby="notification-heading">
+                <header class="section-header">
+                    <h2 id="notification-heading" class="section-title">System Status Notifications</h2>
+                </header>
+
+                <div class="notifications-list">
+                    <article class="notification-item warning-alert">
+                        <header class="notification-header">
+                            <span class="notification-status">SYSTEM WARNING</span>
+                            <span class="notification-time">10 minutes ago</span>
+                        </header>
+                        <p class="notification-body">API connection to Shodan feed failed. Attempting reconnection
+                            automatically.</p>
+                    </article>
+
+                    <article class="notification-item success-alert">
+                        <header class="notification-header">
+                            <span class="notification-status">UPDATE SUCCESS</span>
+                            <span class="notification-time">1 hour ago</span>
+                        </header>
+                        <p class="notification-body">Malware Signature Database successfully synced with Abuse.ch (added
+                            412 new signatures).</p>
+                    </article>
+
+                    <article class="notification-item info-alert">
+                        <header class="notification-header">
+                            <span class="notification-status">USER AUDIT</span>
+                            <span class="notification-time">2 hours ago</span>
+                        </header>
+                        <p class="notification-body">Analyst John Doe uploaded a new Threat Incident Report:
+                            <strong>TR-2026-06</strong>.</p>
+                    </article>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- Global Platform Footer -->
+    <footer class="main-footer">
+        <div class="footer-content">
+            <p class="copyright-text">&copy; 2026 Threat Intelligence Platform. All Rights Reserved. Securing Assets
+                Globally.</p>
+            <nav class="footer-links" aria-label="Legal Links">
+                <a href="#" class="footer-link">Privacy Policy</a>
+                <span class="separator">|</span>
+                <a href="#" class="footer-link">Terms of Service</a>
+                <span class="separator">|</span>
+                <a href="#" class="footer-link">Security Audit Logs</a>
+            </nav>
+        </div>
+    </footer>
+
+</body>
+
+</html>

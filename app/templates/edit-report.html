@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Edit Threat Report | Threat Intelligence Platform</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+
+</head>
+
+<body style="font-size: 20px;">
+
+    <!-- ==========================================================
+     NAVBAR
+=========================================================== -->
+
+    <header class="navbar">
+
+        <div class="navbar-left">
+
+            <button class="menu-toggle">
+
+                <i class="fas fa-bars"></i>
+
+            </button>
+
+            <h1 class="logo">
+
+                Threat Intelligence Platform
+
+            </h1>
+
+        </div>
+
+        <div class="navbar-right">
+
+            <span class="user-name">
+
+                Welcome,
+                <strong>{{ current_user.username }}</strong>
+
+            </span>
+
+            <a href="{{ url_for('auth.logout') }}" class="logout-btn">
+
+                <i class="fas fa-sign-out-alt"></i>
+
+                Logout
+
+            </a>
+
+        </div>
+
+    </header>
+
+
+    <!-- ==========================================================
+     DASHBOARD LAYOUT
+=========================================================== -->
+
+    <div class="dashboard-container">
+
+        <!-- ==========================================================
+     SIDEBAR
+=========================================================== -->
+
+        <aside class="sidebar">
+
+            <nav>
+
+                <ul>
+
+                    <li>
+
+                        <a href="{{ url_for('dashboard.dashboard') }}">
+
+                            <i class="fas fa-chart-line"></i>
+
+                            Dashboard
+
+                        </a>
+
+                    </li>
+
+                    <li>
+
+                        <a href="{{ url_for('dashboard.threat_feed') }}">
+
+                            <i class="fas fa-rss"></i>
+
+                            Threat Feed
+
+                        </a>
+
+                    </li>
+
+                    <li>
+
+                        <a href="{{ url_for('dashboard.ip_checker') }}">
+
+                            <i class="fas fa-network-wired"></i>
+
+                            IP Checker
+
+                        </a>
+
+                    </li>
+
+                    <li>
+
+                        <a href="{{ url_for('dashboard.malware_info') }}">
+
+                            <i class="fas fa-bug"></i>
+
+                            Malware Info
+
+                        </a>
+
+                    </li>
+
+                    <li class="active">
+
+                        <a href="{{ url_for('dashboard.threat_reports') }}">
+
+                            <i class="fas fa-file-shield"></i>
+
+                            Threat Reports
+
+                        </a>
+
+                    </li>
+
+                    <li>
+
+                        <a href="{{ url_for('dashboard.search_threats') }}">
+
+                            <i class="fas fa-search"></i>
+
+                            Search Threats
+
+                        </a>
+
+                    </li>
+
+                    <li>
+
+                        <a href="{{ url_for('dashboard.alerts') }}">
+
+                            <i class="fas fa-bell"></i>
+
+                            Alerts
+
+                        </a>
+
+                    </li>
+
+                    <li>
+
+                        <a href="{{ url_for('dashboard.profile') }}">
+
+                            <i class="fas fa-user"></i>
+
+                            Profile
+
+                        </a>
+
+                    </li>
+
+                </ul>
+
+            </nav>
+
+        </aside>
+
+
+        <!-- ==========================================================
+     MAIN CONTENT
+=========================================================== -->
+
+        <main class="main-content">
+
+            <!-- ==========================================================
+     PAGE HEADER
+=========================================================== -->
+
+            <section class="page-header">
+
+                <div>
+
+                    <h2>
+
+                        Edit Threat Report
+
+                    </h2>
+
+                    <p>
+
+                        Modify the selected threat report and save the updated
+                        intelligence.
+
+                    </p>
+
+                </div>
+
+                <div>
+
+                    <a href="{{ url_for('dashboard.view_report',
+                             report_id=report.id) }}" class="btn btn-secondary">
+
+                        <i class="fas fa-arrow-left"></i>
+
+                        Back to Report
+
+                    </a>
+
+                </div>
+
+            </section>
+
+
+            <!-- ==========================================================
+     FLASH MESSAGES
+=========================================================== -->
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+
+            {% if messages %}
+
+            {% for category, message in messages %}
+
+            <div class="alert alert-{{ category }}">
+
+                {{ message }}
+
+            </div>
+
+            {% endfor %}
+
+            {% endif %}
+
+            {% endwith %}part 2
+            <!-- ==========================================================
+     EDIT REPORT FORM
+=========================================================== -->
+
+            <section class="dashboard-card">
+
+                <header class="section-header">
+
+                    <h2 class="section-title">
+
+                        Edit Threat Report
+
+                    </h2>
+
+                </header>
+
+                <form action="{{ url_for('dashboard.edit_report',
+                             report_id=report.id) }}" method="POST" enctype="multipart/form-data" class="report-form">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                    <!-- ================= Title ================= -->
+
+                    <div class="form-group">
+
+                        <label for="title">
+
+                            Report Title
+
+                        </label>
+
+                        <input type="text" id="title" name="title" class="form-control" value="{{ report.title }}"
+                            required>
+
+                    </div>
+
+
+                    <!-- ================= Summary ================= -->
+
+                    <div class="form-group">
+
+                        <label for="summary">
+
+                            Report Summary
+
+                        </label>
+
+                        <textarea id="summary" name="summary" class="form-control" rows="6"
+                            required>{{ report.description }}</textarea>
+
+                    </div>
+
+
+                    <!-- ================= Category ================= -->
+
+                    <div class="form-group">
+
+                        <label for="category">
+
+                            Threat Category
+
+                        </label>
+
+                        <select id="category" name="category" class="form-control" required>
+
+                            <option value="Malware" {% if report.category=="Malware" %}selected{% endif %}>
+                                Malware
+                            </option>
+
+                            <option value="Phishing" {% if report.category=="Phishing" %}selected{% endif %}>
+                                Phishing
+                            </option>
+
+                            <option value="Ransomware" {% if report.category=="Ransomware" %}selected{% endif %}>
+                                Ransomware
+                            </option>
+
+                            <option value="APT" {% if report.category=="APT" %}selected{% endif %}>
+                                APT
+                            </option>
+
+                            <option value="Vulnerability" {% if report.category=="Vulnerability" %}selected{% endif %}>
+                                Vulnerability
+                            </option>
+
+                            <option value="Botnet" {% if report.category=="Botnet" %}selected{% endif %}>
+                                Botnet
+                            </option>
+
+                            <option value="Other" {% if report.category=="Other" %}selected{% endif %}>
+                                Other
+                            </option>
+
+                        </select>
+
+                    </div>
+
+
+                    <!-- ================= Severity ================= -->
+
+                    <div class="form-group">
+
+                        <label for="severity">
+
+                            Severity
+
+                        </label>
+
+                        <select id="severity" name="severity" class="form-control" required>
+
+                            <option value="Low" {% if report.severity=="Low" %}selected{% endif %}>
+                                Low
+                            </option>
+
+                            <option value="Medium" {% if report.severity=="Medium" %}selected{% endif %}>
+                                Medium
+                            </option>
+
+                            <option value="High" {% if report.severity=="High" %}selected{% endif %}>
+                                High
+                            </option>
+
+                            <option value="Critical" {% if report.severity=="Critical" %}selected{% endif %}>
+                                Critical
+                            </option>
+
+                        </select>
+
+                    </div>
+
+
+                    <!-- ================= Status ================= -->
+
+                    <div class="form-group">
+
+                        <label for="status">
+
+                            Status
+
+                        </label>
+
+                        <select id="status" name="status" class="form-control" required>
+
+                            <option value="Open" {% if report.status=="Open" %}selected{% endif %}>
+                                Open
+                            </option>
+
+                            <option value="Investigating" {% if report.status=="Investigating" %}selected{% endif %}>
+                                Investigating
+                            </option>
+
+                            <option value="Resolved" {% if report.status=="Resolved" %}selected{% endif %}>
+                                Resolved
+                            </option>
+
+                            <option value="Closed" {% if report.status=="Closed" %}selected{% endif %}>
+                                Closed
+                            </option>
+
+                        </select>
+
+                    </div>
+
+
+                    <!-- ================= TLP ================= -->
+
+                    <div class="form-group">
+
+                        <label for="tlp_level">
+
+                            TLP Level
+
+                        </label>
+
+                        <select id="tlp_level" name="tlp_level" class="form-control" required>
+
+                            <option value="WHITE" {% if report.tlp_level=="WHITE" %}selected{% endif %}>
+                                WHITE
+                            </option>
+
+                            <option value="GREEN" {% if report.tlp_level=="GREEN" %}selected{% endif %}>
+                                GREEN
+                            </option>
+
+                            <option value="AMBER" {% if report.tlp_level=="AMBER" %}selected{% endif %}>
+                                AMBER
+                            </option>
+
+                            <option value="RED" {% if report.tlp_level=="RED" %}selected{% endif %}>
+                                RED
+                            </option>
+
+                        </select>
+
+                    </div>
+
+
+                    <!-- ================= Target Sector ================= -->
+
+                    <div class="form-group">
+
+                        <label for="sectors">
+
+                            Target Sector
+
+                        </label>
+
+                        <input type="text" id="sectors" name="sectors" class="form-control"
+                            value="{{ report.target_sector }}" placeholder="Government, Banking, Healthcare...">
+
+                    </div>
+
+
+                    <!-- ================= Current Attachment ================= -->
+
+                    <div class="form-group">
+
+                        <label>
+
+                            Current Attachment
+
+                        </label>
+
+                        {% if report.attachment %}
+
+                        <div class="dashboard-card">
+
+                            <i class="fas fa-paperclip"></i>
+
+                            {{ report.attachment }}
+
+                        </div>
+
+                        {% else %}
+
+                        <div class="dashboard-card">
+
+                            No attachment uploaded.
+
+                        </div>
+
+                        {% endif %}
+
+                    </div>
+
+
+                    <!-- ================= Upload New Attachment ================= -->
+
+                    <div class="form-group">
+
+                        <label for="report_file">
+
+                            Replace Attachment (Optional)
+
+                        </label>
+
+                        <input type="file" id="report_file" name="report_file" class="form-control">
+
+                        <small>
+
+                            Leave this empty if you want to keep the existing attachment.
+
+                        </small>
+
+                    </div>
+                    <!-- ==========================================================
+             ACTION BUTTONS
+        ========================================================== -->
+
+                    <div class="form-actions">
+
+                        <button type="submit" class="btn btn-primary">
+
+                            <i class="fas fa-save"></i>
+
+                            Update Report
+
+                        </button>
+
+                        <button type="reset" class="btn btn-warning">
+
+                            <i class="fas fa-rotate-left"></i>
+
+                            Reset Changes
+
+                        </button>
+
+                        <a href="{{ url_for('dashboard.view_report',
+                                 report_id=report.id) }}" class="btn btn-secondary">
+
+                            <i class="fas fa-times"></i>
+
+                            Cancel
+
+                        </a>
+
+                    </div>
+
+                </form>
+
+            </section>
+
+
+            <!-- ==========================================================
+     QUICK ACTIONS
+=========================================================== -->
+
+            <section class="notification-section">
+
+                <header class="section-header">
+
+                    <h2 class="section-title">
+
+                        Quick Actions
+
+                    </h2>
+
+                </header>
+
+                <div class="dashboard-cards-grid">
+
+                    <!-- View Report -->
+
+                    <article class="dashboard-card status-info">
+
+                        <header class="card-header">
+
+                            <h3 class="card-title">
+
+                                View Report
+
+                            </h3>
+
+                            <span class="card-icon">
+
+                                <i class="fas fa-eye"></i>
+
+                            </span>
+
+                        </header>
+
+                        <p>
+
+                            View the latest version of this report.
+
+                        </p>
+
+                        <footer class="card-footer">
+
+                            <a href="{{ url_for('dashboard.view_report',
+                                     report_id=report.id) }}" class="card-link">
+
+                                Open →
+
+                            </a>
+
+                        </footer>
+
+                    </article>
+
+
+                    <!-- All Reports -->
+
+                    <article class="dashboard-card status-success">
+
+                        <header class="card-header">
+
+                            <h3 class="card-title">
+
+                                Threat Reports
+
+                            </h3>
+
+                            <span class="card-icon">
+
+                                <i class="fas fa-file-alt"></i>
+
+                            </span>
+
+                        </header>
+
+                        <p>
+
+                            Return to the Threat Reports dashboard.
+
+                        </p>
+
+                        <footer class="card-footer">
+
+                            <a href="{{ url_for('dashboard.threat_reports') }}" class="card-link">
+
+                                Open →
+
+                            </a>
+
+                        </footer>
+
+                    </article>
+
+
+                    <!-- Upload -->
+
+                    <article class="dashboard-card status-warning">
+
+                        <header class="card-header">
+
+                            <h3 class="card-title">
+
+                                Upload Report
+
+                            </h3>
+
+                            <span class="card-icon">
+
+                                <i class="fas fa-upload"></i>
+
+                            </span>
+
+                        </header>
+
+                        <p>
+
+                            Submit another threat intelligence report.
+
+                        </p>
+
+                        <footer class="card-footer">
+
+                            <a href="{{ url_for('dashboard.threat_report_upload') }}" class="card-link">
+
+                                Upload →
+
+                            </a>
+
+                        </footer>
+
+                    </article>
+
+
+                    <!-- Dashboard -->
+
+                    <article class="dashboard-card status-critical">
+
+                        <header class="card-header">
+
+                            <h3 class="card-title">
+
+                                Dashboard
+
+                            </h3>
+
+                            <span class="card-icon">
+
+                                <i class="fas fa-chart-line"></i>
+
+                            </span>
+
+                        </header>
+
+                        <p>
+
+                            Return to the main dashboard.
+
+                        </p>
+
+                        <footer class="card-footer">
+
+                            <a href="{{ url_for('dashboard.dashboard') }}" class="card-link">
+
+                                Dashboard →
+
+                            </a>
+
+                        </footer>
+
+                    </article>
+
+                </div>
+
+            </section>
+            <!-- ==========================================================
+     FOOTER
+=========================================================== -->
+
+        </main>
+
+    </div>
+
+    <footer class="main-footer">
+
+        <div class="footer-content">
+
+            <p>
+
+                &copy; 2026 Threat Intelligence Platform.
+                All Rights Reserved.
+
+            </p>
+
+            <nav class="footer-links">
+
+                <a href="#">
+
+                    Privacy Policy
+
+                </a>
+
+                <span>|</span>
+
+                <a href="#">
+
+                    Terms of Service
+
+                </a>
+
+                <span>|</span>
+
+                <a href="#">
+
+                    Security Policy
+
+                </a>
+
+            </nav>
+
+        </div>
+
+    </footer>
+
+
+    <!-- ==========================================================
+     JAVASCRIPT
+    =========================================================== -->
+
+    <script src="{{ url_for('static', filename='js/1-funtioning.js') }}"></script>
+    <!-- <link rel="stylesheet" href="../static/css/style.css">  -->
+
+    <!-- <script src="{{ url_for('static', filename='js/edit-report.js') }}"></script> -->
+
+</body>
+
+</html>

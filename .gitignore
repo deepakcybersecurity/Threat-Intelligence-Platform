@@ -1,0 +1,58 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Environment Variables & Secrets (CRITICAL SECURITY)
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+*.crt
+
+# Virtual Environments
+.venv/
+venv/
+ENV/
+env/
+env.bak/
+venv.bak/
+
+# Database & SQLite files
+*.sqlite3
+*.db
+instance/
+
+# Flask & Application Uploads
+app/static/uploads/*
+!app/static/uploads/.gitkeep
+uploads/
+
+# Testing & Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+
+# IDE & Editor Configuration
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Logs & Debugging
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*

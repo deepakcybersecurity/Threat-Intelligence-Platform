@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description"
+        content="Search Threats Database. Query global indicators of compromise, vulnerabilities (CVEs), targeted sectors, and threat actors profile.">
+    <title>Search Threats - Threat Intelligence Platform</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="{{ url_for('static', filename='js/1-funtioning.js') }}" defer></script>
+</head>
+
+<body class="dashboard-page" style="font-size: 20px;">
+
+    <!-- Top Navigation Header -->
+    <header class="main-header">
+        <nav class="navbar dashboard-navbar" aria-label="Main Navigation">
+            <div class="navbar-brand">
+                <a href="{{ url_for('main.home') }}" class="logo-link">
+                    <span class="logo-icon">&#128737;</span>
+                    <span class="logo-text">ThreatIntel Platform</span>
+                </a>
+            </div>
+
+            <!-- Global Quick Search -->
+            <div class="navbar-search">
+                <form action="{{ url_for('dashboard.search_threats') }}" method="GET" class="search-form">
+                    <label for="global-search" class="visually-hidden">Search threats, IPs, hashes</label>
+                    <input type="search" id="global-search" name="query" class="search-input"
+                        placeholder="Search threats, IPs, CVEs...">
+                    <button type="submit" class="search-button">Search</button>
+                </form>
+            </div>
+
+            <div class="navbar-user-menu">
+                <span class="user-role badge-critical">SecOps Admin</span>
+                <a href="{{ url_for('dashboard.profile') }}" class="user-profile-link">Profile Settings</a>
+                <a href="{{ url_for('auth.login') }}" class="logout-link">Sign Out</a>
+            </div>
+        </nav>
+    </header>
+
+    <div class="layout-container">
+
+        <!-- Left Sidebar Navigation -->
+        <aside class="sidebar" aria-label="Sidebar Navigation">
+            <nav class="sidebar-navigation">
+                <ul class="sidebar-menu">
+                    <li><a href="{{ url_for('dashboard.dashboard') }}" class="menu-item">Dashboard Overview</a></li>
+                    <li><a href="{{ url_for('dashboard.threat_feed') }}" class="menu-item">Live Threat Feed</a></li>
+                    <li><a href="{{ url_for('dashboard.ip_checker') }}" class="menu-item">IP Address Checker</a></li>
+                    <li><a href="{{ url_for('dashboard.malware_info') }}" class="menu-item">Malware Information</a></li>
+                    <li><a href="{{ url_for('dashboard.threat_report_upload') }}" class="menu-item">Upload Threat
+                            Report</a></li>
+                    <li><a href="{{ url_for('dashboard.search_threats') }}" class="menu-item active-menu-item">Search
+                            Threats Database</a></li>
+                    <li><a href="{{ url_for('dashboard.alerts') }}" class="menu-item">Alerts & Notifications</a></li>
+                    <li><a href="{{ url_for('admin.admin') }}" class="menu-item">System Admin Panel</a></li>
+                </ul>
+            </nav>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="dashboard-main-content">
+
+            <section class="search-threats-section" aria-labelledby="search-heading">
+                <header class="section-header">
+                    <h1 id="search-heading" class="page-title">Search Threats Database</h1>
+                    <p class="page-subtitle" style="font-size: 20px;">Execute advanced queries across the comprehensive
+                        threat log database, CVE list, and Threat Actor files</p>
+                </header>
+
+                <!-- Search and Filters Form -->
+                <form action="{{ url_for('dashboard.search_threats') }}" method="GET" class="search-filters-form">
+
+                    <fieldset class="search-box-fieldset">
+                        <legend class="visually-hidden">Search Query</legend>
+                        <div class="form-group inline-group">
+                            <label for="main-search-input" class="visually-hidden">Search query</label>
+                            <!-- <input type="text" id="main-search-input" name="query" class="form-input search-large-input" 
+                                   placeholder="Search indicators, threat actors (e.g. APT41), target countries, CVEs (e.g. CVE-2021-44228)..." required> -->
+                            <input type="text" id="main-search-input" name="query" class="form-input search-large-input"
+                                placeholder="Search indicators, threat actors..." value="{{ query }}" required>
+                            <button type="submit" class="btn btn-search btn-primary">Search Database</button>
+                        </div>
+                    </fieldset>
+
+                    <!-- Advanced Filters Block -->
+                    <fieldset class="filter-group-fieldset">
+                        <legend class="filter-legend">Advanced Database Filters</legend>
+
+                        <div class="filter-grid">
+
+                            <!-- Threat Type Checkboxes -->
+                            <div class="filter-column">
+                                <h3>Indicator Type</h3>
+                                <div class="checkbox-list">
+                                    <div class="checkbox-item">
+                                        <input type="checkbox" id="type-ip" name="types" value="ip" checked>
+                                        <label for="type-ip">IP Address</label>
+                                    </div>
+                                    <div class="checkbox-item">
+                                        <input type="checkbox" id="type-domain" name="types" value="domain" checked>
+                                        <label for="type-domain">Domain Name</label>
+                                    </div>
+                                    <div class="checkbox-item">
+                                        <input type="checkbox" id="type-hash" name="types" value="hash" checked>
+                                        <label for="type-hash">File Hash (MD5/SHA)</label>
+                                    </div>
+                                    <div class="checkbox-item">
+                                        <input type="checkbox" id="type-cve" name="types" value="cve">
+                                        <label for="type-cve">CVE Vulnerability</label>
+                                    </div>
+                                    <div class="checkbox-item">
+                                        <input type="checkbox" id="type-actor" name="types" value="actor">
+                                        <label for="type-actor">Threat Actor Group</label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Severity Checkboxes -->
+                            <div class="filter-column">
+                                <h3>Severity Classification</h3>
+                                <div class="checkbox-list">
+                                    <div class="checkbox-item">
+                                        <input type="checkbox" id="sev-critical" name="severities" value="critical"
+                                            checked>
+                                        <label for="sev-critical" class="badge-critical-text">Critical</label>
+                                    </div>
+                                    <div class="checkbox-item">
+                                        <input type="checkbox" id="sev-high" name="severities" value="high" checked>
+                                        <label for="sev-high" class="badge-warning-text">High</label>
+                                    </div>
+                                    <div class="checkbox-item">
+                                        <input type="checkbox" id="sev-medium" name="severities" value="medium">
+                                        <label for="sev-medium" class="badge-info-text">Medium</label>
+                                    </div>
+                                    <div class="checkbox-item">
+                                        <input type="checkbox" id="sev-low" name="severities" value="low">
+                                        <label for="sev-low" class="badge-success-text">Low</label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Country and Timeframe Selectors -->
+                            <div class="filter-column">
+                                <h3>Geographical & Time Origin</h3>
+
+                                <div class="form-group select-filter-group">
+                                    <label for="target-country" class="form-label">Origin Country</label>
+                                    <select id="target-country" name="country" class="form-select">
+                                        <option value="any">Any Country</option>
+                                        <option value="us">United States (US)</option>
+                                        <option value="cn">China (CN)</option>
+                                        <option value="ru">Russia (RU)</option>
+                                        <option value="kp">North Korea (KP)</option>
+                                        <option value="ir">Iran (IR)</option>
+                                    </select>
+                                </div>
+
+                                <div class="form-group select-filter-group">
+                                    <label for="time-range" class="form-label">Detected Timeframe</label>
+                                    <select id="time-range" name="timeframe" class="form-select">
+                                        <option value="24h">Last 24 Hours</option>
+                                        <option value="7d" selected>Last 7 Days</option>
+                                        <option value="30d">Last 30 Days</option>
+                                        <option value="365d">Last Year</option>
+                                        <option value="all">All Historical Records</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                        </div>
+                    </fieldset>
+                </form>
+
+                <!-- Search Results Section -->
+                <section class="search-results-section" aria-labelledby="results-summary">
+                    <header class="results-header">
+                        <h2 id="results-summary" class="results-title">
+                            Search Results
+                            {% if query %}
+                            ({{ reports|length }} matching "{{ query }}")
+                            {% else %}
+                            ({{ reports|length }} Total Reports)
+                            {% endif %}
+                        </h2>
+                    </header>
+
+                    <div class="table-container">
+                        <table class="data-table">
+                            <caption>List of matched threat intel records database</caption>
+                            <thead>
+                                <tr>
+                                    <th scope="col">Incident ID</th>
+                                    <th scope="col">Target / Indicator</th>
+                                    <th scope="col">Record Type</th>
+                                    <th scope="col">Severity</th>
+                                    <th scope="col">Origin Country</th>
+                                    <th scope="col">Last Activity</th>
+                                    <th scope="col">Detail Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            <tbody>
+
+                                {% if reports %}
+
+                                {% for report in reports %}
+
+                                <tr>
+
+                                    <td>
+
+                                        <strong>
+
+                                            TH-{{ "%04d"|format(report.id) }}
+
+                                        </strong>
+
+                                    </td>
+
+                                    <td>
+
+                                        {{ report.title }}
+
+                                    </td>
+
+                                    <td>
+
+                                        {{ report.category }}
+
+                                    </td>
+
+                                    <td>
+
+                                        {% if report.severity == "Critical" %}
+
+                                        <span class="badge badge-critical">
+
+                                            {{ report.severity }}
+
+                                        </span>
+
+                                        {% elif report.severity == "High" %}
+
+                                        <span class="badge badge-warning">
+
+                                            {{ report.severity }}
+
+                                        </span>
+
+                                        {% elif report.severity == "Medium" %}
+
+                                        <span class="badge badge-info">
+
+                                            {{ report.severity }}
+
+                                        </span>
+
+                                        {% else %}
+
+                                        <span class="badge badge-success">
+
+                                            {{ report.severity }}
+
+                                        </span>
+
+                                        {% endif %}
+
+                                    </td>
+
+                                    <td>
+
+                                        {{ report.target_sector }}
+
+                                    </td>
+
+                                    <td>
+
+                                        {{ report.created_at.strftime("%d-%m-%Y") }}
+
+                                    </td>
+
+                                    <td>
+
+                                        <a href="{{ url_for('dashboard.view_report',
+                                 report_id=report.id) }}" class="btn-table-action">
+
+                                            View Report
+
+                                        </a>
+
+                                    </td>
+
+                                </tr>
+
+                                {% endfor %}
+
+                                {% else %}
+
+                                <tr>
+
+                                    <td colspan="7" style="text-align:center;">
+
+                                        No Threat Reports Found.
+
+                                    </td>
+
+                                </tr>
+
+                                {% endif %}
+
+                            </tbody>
+
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+            </section>
+
+        </main>
+    </div>
+
+    <!-- Global Platform Footer -->
+    <footer class="main-footer">
+        <div class="footer-content">
+            <p class="copyright-text">&copy; 2026 Threat Intelligence Platform. All Rights Reserved. Securing Assets
+                Globally.</p>
+            <nav class="footer-links" aria-label="Legal Links">
+                <a href="#" class="footer-link">Privacy Policy</a>
+                <span class="separator">|</span>
+                <a href="#" class="footer-link">Terms of Service</a>
+                <span class="separator">|</span>
+                <a href="#" class="footer-link">Security Audit Logs</a>
+            </nav>
+        </div>
+    </footer>
+
+</body>
+
+</html>

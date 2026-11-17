@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description"
+        content="IP Address Reputation Checker. Analyze IP reputation, blocklist status, ISP ownership, geo-location, and associated cyberattack history.">
+    <title>IP Address Checker - Threat Intelligence Platform</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="{{ url_for('static', filename='js/1-funtioning.js') }}" defer></script>
+</head>
+
+<body class="dashboard-page">
+
+    <!-- Top Navigation Header -->
+    <header class="main-header">
+        <nav class="navbar dashboard-navbar" aria-label="Main Navigation">
+            <div class="navbar-brand">
+                <a href="{{ url_for('main.home') }}" class="logo-link">
+                    <span class="logo-icon">&#128737;</span>
+                    <span class="logo-text">ThreatIntel Platform</span>
+                </a>
+            </div>
+
+            <!-- Global Quick Search -->
+            <div class="navbar-search">
+                <form action="{{ url_for('dashboard.search_threats') }}" method="GET" class="search-form">
+                    <label for="global-search" class="visually-hidden">Search threats, IPs, hashes</label>
+                    <input type="search" id="global-search" name="query" class="search-input"
+                        placeholder="Search threats, IPs, CVEs...">
+                    <button type="submit" class="search-button">Search</button>
+                </form>
+            </div>
+
+            <div class="navbar-user-menu">
+                <span class="user-role badge-critical">SecOps Admin</span>
+                <a href="{{ url_for('dashboard.profile') }}" class="user-profile-link">Profile Settings</a>
+                <a href="{{ url_for('auth.login') }}" class="logout-link">Sign Out</a>
+            </div>
+        </nav>
+    </header>
+
+    <div class="layout-container">
+
+        <!-- Left Sidebar Navigation -->
+        <aside class="sidebar" aria-label="Sidebar Navigation">
+            <nav class="sidebar-navigation">
+                <ul class="sidebar-menu">
+                    <li><a href="{{ url_for('dashboard.dashboard') }}" class="menu-item">Dashboard Overview</a></li>
+                    <li><a href="{{ url_for('dashboard.threat_feed') }}" class="menu-item">Live Threat Feed</a></li>
+                    <li><a href="{{ url_for('dashboard.ip_checker') }}" class="menu-item active-menu-item">IP Address
+                            Checker</a></li>
+                    <li><a href="{{ url_for('dashboard.ip_lookup_history') }}" class="menu-item"> View Lookup History</a></li>
+                    <li><a href="{{ url_for('dashboard.malware_info') }}" class="menu-item">Malware Information</a></li>
+                    <li><a href="{{ url_for('dashboard.threat_report_upload') }}" class="menu-item">Upload Threat
+                            Report</a></li>
+                    <li><a href="{{ url_for('dashboard.search_threats') }}" class="menu-item">Search Threats
+                            Database</a></li>
+                    <li><a href="{{ url_for('dashboard.alerts') }}" class="menu-item">Alerts & Notifications</a></li>
+                    <li><a href="{{ url_for('admin.admin') }}" class="menu-item">System Admin Panel</a></li>
+                </ul>
+            </nav>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="dashboard-main-content">
+
+            <section class="ip-checker-section" aria-labelledby="ip-checker-heading">
+                <header class="section-header">
+                    <h1 id="ip-checker-heading" class="page-title">IP Address Reputation Checker</h1>
+                    <p class="page-subtitle">Instantly analyze network intelligence, geological routing, and historical
+                        malicious indicators of any IPv4 or IPv6 address</p>
+                </header>
+
+                <!-- Search IP Form -->
+                <fieldset class="search-fieldset">
+                    <legend>Query IP Reputation</legend>
+                    <form action="{{ url_for('dashboard.ip_checker') }}" method="POST" class="search-form-block">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <div class="form-group inline-group">
+                            <label for="ip-address" class="form-label visually-hidden">IP Address</label>
+                            <input type="text" id="ip-address" name="ip_address" class="form-input search-large-input"
+                                placeholder="Enter IP Address (e.g. 198.51.100.42)"
+                                value="{{ request.form.get('ip_address', '') }}" required>
+                            <button type="submit" class="btn btn-search btn-primary">Check Reputation</button>
+                            <a href="{{ url_for('dashboard.ip_lookup_history') }}" class="btn btn-secondary">
+                                View Lookup History
+                            </a>
+                        </div>
+                    </form>
+                </fieldset>
+
+                <!-- Result Status Message -->
+                {% if error %}
+
+                <div class="threat-status-alert danger-alert" role="alert">
+                    <span class="alert-icon">&#9888;</span>
+
+                    <div class="alert-text-wrapper">
+                        <strong class="alert-heading">IP Reputation Check Failed</strong>
+
+                        <p class="alert-body">
+                            {{ error }}
+                        </p>
+                    </div>
+                </div>
+
+                {% elif result %}
+
+                <div class="threat-status-alert 
+                    {% if result.abuseConfidenceScore >= 50 %}
+                        danger-alert
+                    {% else %}
+                        success-alert
+                    {% endif %}
+                " role="alert">
+
+                    <span class="alert-icon">
+                        {% if result.abuseConfidenceScore >= 50 %}
+                        &#9785;
+                        {% else %}
+                        &#10003;
+                        {% endif %}
+                    </span>
+
+                    <div class="alert-text-wrapper">
+
+                        {% if result.abuseConfidenceScore >= 50 %}
+
+                        <strong class="alert-heading">
+                            Malicious Activity Detected!
+                        </strong>
+
+                        <p class="alert-body">
+                            IP address
+                            <strong>{{ result.ipAddress }}</strong>
+                            has an Abuse Confidence Score of
+                            <strong>{{ result.abuseConfidenceScore }}%</strong>.
+                        </p>
+
+                        {% else %}
+
+                        <strong class="alert-heading">
+                            No Significant Abuse Detected
+                        </strong>
+
+                        <p class="alert-body">
+                            IP address
+                            <strong>{{ result.ipAddress }}</strong>
+                            has an Abuse Confidence Score of
+                            <strong>{{ result.abuseConfidenceScore }}%</strong>.
+                        </p>
+
+                        {% endif %}
+
+                    </div>
+                </div>
+
+                {% endif %}
+
+                <!-- Analysis Dashboard Layout Grid -->
+                <div class="ip-analysis-grid">
+
+                    <!-- Basic IP Information -->
+                    <article class="analysis-card">
+                        <header class="card-header">
+                            <h2 class="card-title">Network & Geolocation Details</h2>
+                        </header>
+                        <table class="details-table">
+                            <tbody>
+
+                                {% if result %}
+
+                                <tr>
+                                    <th scope="row">IP Address</th>
+                                    <td>
+                                        <code>{{ result.ipAddress }}</code>
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <th scope="row">IP Version</th>
+                                    <td>
+                                        IPv{{ result.ipVersion }}
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <th scope="row">Internet Service Provider</th>
+                                    <td>
+                                        {{ result.isp or "Unknown" }}
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <th scope="row">Usage Type</th>
+                                    <td>
+                                        {{ result.usageType or "Unknown" }}
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <th scope="row">Geographic Country</th>
+                                    <td>
+                                        {{ result.countryCode or "Unknown" }}
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <th scope="row">Domain Hostname</th>
+                                    <td>
+                                        {{ result.domain or "None" }}
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <th scope="row">Tor Exit Node</th>
+                                    <td>
+                                        {% if result.isTor %}
+                                        Yes
+                                        {% else %}
+                                        No
+                                        {% endif %}
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <th scope="row">Whitelisted</th>
+                                    <td>
+                                        {% if result.isWhitelisted %}
+                                        Yes
+                                        {% else %}
+                                        No
+                                        {% endif %}
+                                    </td>
+                                </tr>
+
+                                {% else %}
+
+                                <tr>
+                                    <td colspan="2">
+                                        Enter an IP address above to perform a reputation check.
+                                    </td>
+                                </tr>
+
+                                {% endif %}
+
+                            </tbody>
+                        </table>
+                    </article>
+
+                    <!-- Reputation Summary -->
+                    <article class="analysis-card">
+                        <header class="card-header">
+                            <h2 class="card-title">Security & Threat Score</h2>
+                        </header>
+
+                        {% if result %}
+
+                        <div class="score-display">
+
+                            <span class="score-label">
+                                Abuse Confidence Score
+                            </span>
+
+                            <span class="score-value critical-score">
+                                {{ result.abuseConfidenceScore }} / 100
+                            </span>
+
+                            <span class="score-subtext">
+
+                                {% if result.abuseConfidenceScore >= 75 %}
+                                Highly suspicious IP address.
+                                {% elif result.abuseConfidenceScore >= 50 %}
+                                Suspicious IP address.
+                                {% elif result.abuseConfidenceScore >= 25 %}
+                                Some abuse activity reported.
+                                {% else %}
+                                Low abuse confidence score.
+                                {% endif %}
+
+                            </span>
+
+                        </div>
+
+                        <hr class="card-divider">
+
+                        <h3 class="subsection-title">
+                            Threat Information
+                        </h3>
+
+                        <ul class="threat-category-list">
+
+                            <li>
+                                <strong>Total Reports:</strong>
+                                {{ result.totalReports }}
+                            </li>
+
+                            <li>
+                                <strong>Distinct Reporters:</strong>
+                                {{ result.numDistinctUsers }}
+                            </li>
+
+                            <li>
+                                <strong>Tor:</strong>
+                                {% if result.isTor %}
+                                Yes
+                                {% else %}
+                                No
+                                {% endif %}
+                            </li>
+
+                            <li>
+                                <strong>Whitelisted:</strong>
+                                {% if result.isWhitelisted %}
+                                Yes
+                                {% else %}
+                                No
+                                {% endif %}
+                            </li>
+
+                        </ul>
+
+                        {% else %}
+
+                        <div class="score-display">
+
+                            <span class="score-label">
+                                Abuse Confidence Score
+                            </span>
+
+                            <span class="score-value">
+                                --
+                            </span>
+
+                            <span class="score-subtext">
+                                Enter an IP address to perform analysis.
+                            </span>
+
+                        </div>
+
+                        {% endif %}
+
+                        <h3 class="subsection-title">Threat Intelligence Summary</h3>
+
+                        <ul class="threat-category-list">
+
+                            <li>
+                                <span class="bullet-indicator critical-bullet">&#9679;</span>
+                                <strong>Abuse Confidence</strong>:
+                                {{ result.abuseConfidenceScore }}%
+                            </li>
+
+                            <li>
+                                <span class="bullet-indicator warning-bullet">&#9679;</span>
+                                <strong>Total Abuse Reports</strong>:
+                                {{ result.totalReports }}
+                            </li>
+
+                            <li>
+                                <span class="bullet-indicator info-bullet">&#9679;</span>
+                                <strong>Distinct Reporters</strong>:
+                                {{ result.numDistinctUsers }}
+                            </li>
+
+                            <li>
+                                <span class="bullet-indicator info-bullet">&#9679;</span>
+                                <strong>Tor Status</strong>:
+                                {% if result.isTor %}
+                                Detected
+                                {% else %}
+                                Not Detected
+                                {% endif %}
+                            </li>
+
+                            <li>
+                                <span class="bullet-indicator info-bullet">&#9679;</span>
+                                <strong>Whitelist Status</strong>:
+                                {% if result.isWhitelisted %}
+                                Whitelisted
+                                {% else %}
+                                Not Whitelisted
+                                {% endif %}
+                            </li>
+
+                        </ul>
+                    </article>
+
+                </div>
+
+                <!-- Global Blocklist Listing Details -->
+                <section class="blocklist-details-section" aria-labelledby="blocklist-heading">
+
+                    <header class="section-header">
+
+                        <h2 id="blocklist-heading" class="section-title">
+                            AbuseIPDB Intelligence
+                        </h2>
+
+                    </header>
+
+                    {% if result %}
+
+                    <table class="data-table">
+
+                        <caption>
+                            Reputation information returned by AbuseIPDB
+                        </caption>
+
+                        <thead>
+
+                            <tr>
+                                <th>Metric</th>
+                                <th>Value</th>
+                            </tr>
+
+                        </thead>
+
+                        <tbody>
+
+                            <tr>
+                                <td>Abuse Confidence Score</td>
+                                <td>
+                                    {{ result.abuseConfidenceScore }}%
+                                </td>
+                            </tr>
+
+                            <tr>
+                                <td>Total Reports</td>
+                                <td>
+                                    {{ result.totalReports }}
+                                </td>
+                            </tr>
+
+                            <tr>
+                                <td>Distinct Reporters</td>
+                                <td>
+                                    {{ result.numDistinctUsers }}
+                                </td>
+                            </tr>
+
+                            <tr>
+                                <td>Last Reported</td>
+                                <td>
+                                    {{ result.lastReportedAt or "Never" }}
+                                </td>
+                            </tr>
+
+                            <tr>
+                                <td>AbuseIPDB Whitelisted</td>
+                                <td>
+                                    {% if result.isWhitelisted %}
+                                    Yes
+                                    {% else %}
+                                    No
+                                    {% endif %}
+                                </td>
+                            </tr>
+
+                        </tbody>
+
+                    </table>
+
+                    {% else %}
+
+                    <p>
+                        No reputation data available yet.
+                    </p>
+
+                    {% endif %}
+
+                </section>
+
+            </section>
+
+        </main>
+    </div>
+
+    <!-- Global Platform Footer -->
+    <footer class="main-footer">
+        <div class="footer-content">
+            <p class="copyright-text">&copy; 2026 Threat Intelligence Platform. All Rights Reserved. Securing Assets
+                Globally.</p>
+            <nav class="footer-links" aria-label="Legal Links">
+                <a href="#" class="footer-link">Privacy Policy</a>
+                <span class="separator">|</span>
+                <a href="#" class="footer-link">Terms of Service</a>
+                <span class="separator">|</span>
+                <a href="#" class="footer-link">Security Audit Logs</a>
+            </nav>
+        </div>
+    </footer>
+
+</body>
+
+</html>

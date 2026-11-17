@@ -1,0 +1,978 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="SIEM and EDR Integration Hub. Webhook ingestion, real-time IOC query API, and automated firewall blocklist feeds.">
+    <title>SIEM & EDR Integration - Threat Intelligence Platform</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="{{ url_for('static', filename='js/1-funtioning.js') }}" defer></script>
+</head>
+<body class="dashboard-page">
+
+    <!-- Top Navigation Header -->
+    <header class="main-header">
+        <nav class="navbar dashboard-navbar" aria-label="Main Navigation">
+            <div class="navbar-brand">
+                <a href="{{ url_for('main.home') }}" class="logo-link">
+                    <span class="logo-icon">&#128737;</span>
+                    <span class="logo-text">ThreatIntel Platform</span>
+                </a>
+            </div>
+
+            <!-- Global Quick Search -->
+            <div class="navbar-search">
+                <form action="{{ url_for('dashboard.search_threats') }}" method="GET" class="search-form">
+                    <label for="global-search" class="visually-hidden">Search threats, IPs, hashes</label>
+                    <input type="search" id="global-search" name="query" class="search-input" placeholder="Search threats, IPs, CVEs...">
+                    <button type="submit" class="search-button">Search</button>
+                </form>
+            </div>
+
+            <div class="navbar-user-menu">
+                <span class="user-role badge-critical">{{ current_user.role|capitalize if current_user.is_authenticated else 'Analyst' }}</span>
+                <a href="{{ url_for('dashboard.profile') }}" class="user-profile-link">Profile Settings</a>
+                <a href="{{ url_for('auth.logout') }}" class="logout-link">Sign Out</a>
+            </div>
+        </nav>
+    </header>
+
+    <div class="layout-container">
+        
+        <!-- Left Sidebar Navigation -->
+        <aside class="sidebar" aria-label="Sidebar Navigation">
+            <nav class="sidebar-navigation">
+                <ul class="sidebar-menu">
+                    <li><a href="{{ url_for('dashboard.dashboard') }}" class="menu-item">Dashboard Overview</a></li>
+                    <li><a href="{{ url_for('dashboard.threat_feed') }}" class="menu-item">Live Threat Feed</a></li>
+                    <li><a href="{{ url_for('dashboard.threat_news') }}" class="menu-item">Threat News</a></li>
+                    <li><a href="{{ url_for('dashboard.ip_checker') }}" class="menu-item">IP Address Checker</a></li>
+                    <li><a href="{{ url_for('dashboard.malware_info') }}" class="menu-item">Malware Information</a></li>
+                    <li><a href="{{ url_for('dashboard.mitre_matrix') }}" class="menu-item">MITRE ATT&amp;CK Matrix</a></li>
+                    <li><a href="{{ url_for('dashboard.threat_report_upload') }}" class="menu-item">Upload Threat Report</a></li>
+                    <li><a href="{{ url_for('dashboard.search_threats') }}" class="menu-item">Search Threats Database</a></li>
+                    <li><a href="{{ url_for('dashboard.alerts') }}" class="menu-item">Alerts & Notifications</a></li>
+                    <li><a href="{{ url_for('dashboard.siem_edr_integration') }}" class="menu-item active-menu-item">SIEM / EDR Integration</a></li>
+                    <li><a href="{{ url_for('admin.admin') }}" class="menu-item">System Admin Panel</a></li>
+                </ul>
+            </nav>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="dashboard-main-content">
+            
+            <section class="integration-section" aria-labelledby="integration-heading">
+                <header class="section-header">
+                    <h1 id="integration-heading" class="page-title">SIEM & EDR Integration Hub</h1>
+                    <p class="page-subtitle">Bi-directional integration bridge: Ingest alerts from Splunk, Microsoft Sentinel & CrowdStrike, query real-time IOC reputation, and export automated blocklists to firewalls</p>
+                </header>
+
+                <!-- API Endpoint Overview Metric Cards -->
+                <div class="metrics-grid">
+                    <article class="metric-card">
+                        <div class="metric-icon-wrap" style="color: #06b6d4;">&#128229;</div>
+                        <div class="metric-data">
+                            <span class="metric-label">Inbound Webhook API</span>
+                            <span class="metric-value" style="font-size: 1.1rem; word-break: break-all;"><code>/api/v1/webhook/alert</code></span>
+                            <span class="metric-delta delta-positive">HTTP POST &bull; SIEM Ingest &amp; Risk Scoring</span>
+                        </div>
+                    </article>
+
+                    <article class="metric-card">
+                        <div class="metric-icon-wrap" style="color: #f59e0b;">&#128737;</div>
+                        <div class="metric-data">
+                            <span class="metric-label">EDR Alert Ingestion API</span>
+                            <span class="metric-value" style="font-size: 1.1rem; word-break: break-all;"><code>/api/v1/edr/alert</code></span>
+                            <span class="metric-delta delta-positive">HTTP POST &bull; Telemetry &amp; Containment</span>
+                        </div>
+                    </article>
+
+                    <article class="metric-card">
+                        <div class="metric-icon-wrap" style="color: #3b82f6;">&#128269;</div>
+                        <div class="metric-data">
+                            <span class="metric-label">Real-Time IOC Lookup API</span>
+                            <span class="metric-value" style="font-size: 1.1rem; word-break: break-all;"><code>/api/v1/ioc/lookup</code></span>
+                            <span class="metric-delta delta-positive">HTTP GET/POST &bull; Reputation &amp; Action</span>
+                        </div>
+                    </article>
+
+                    <article class="metric-card">
+                        <div class="metric-icon-wrap" style="color: #ef4444;">&#128737;</div>
+                        <div class="metric-data">
+                            <span class="metric-label">Firewall Blocklist Feed</span>
+                            <span class="metric-value" style="font-size: 1.1rem; word-break: break-all;"><code>/api/v1/feed/blocklist/plain</code></span>
+                            <span class="metric-delta delta-positive">Plaintext &bull; Palo Alto / Fortinet / pfSense</span>
+                        </div>
+                    </article>
+
+                    <article class="metric-card">
+                        <div class="metric-icon-wrap" style="color: #a855f7;">&#128225;</div>
+                        <div class="metric-data">
+                            <span class="metric-label">STIX 2.1 / TAXII Export</span>
+                            <span class="metric-value" style="font-size: 1.1rem; word-break: break-all;"><code>/api/v1/stix/bundle</code></span>
+                            <span class="metric-delta delta-positive">OASIS 2.1 &bull; OpenCTI / MISP Sharing</span>
+                        </div>
+                    </article>
+
+                    <article class="metric-card">
+                        <div class="metric-icon-wrap" style="color: #10b981;">&#128273;</div>
+                        <div class="metric-data">
+                            <span class="metric-label">Authentication Header</span>
+                            <span class="metric-value" style="font-size: 1.1rem;"><code>X-API-Key</code></span>
+                            <span class="metric-delta delta-positive">Active Token Configured</span>
+                        </div>
+                    </article>
+                </div>
+
+                <div class="profile-grid-layout" style="margin-top: 1.5rem;">
+                    
+                    <!-- Integration Architecture & Workflow Info -->
+                    <article class="profile-card">
+                        <header class="card-header">
+                            <h2 class="card-title">How TIP Amplifies EDR & SIEM</h2>
+                        </header>
+                        <div class="card-body">
+                            <ul style="line-height: 1.8; color: #cbd5e1; padding-left: 1.25rem;">
+                                <li><strong>1. Alert Ingestion:</strong> Your EDR (CrowdStrike / Defender) or SIEM (Splunk / Sentinel) posts an alert when suspicious activity triggers.</li>
+                                <li><strong>2. Auto-Extraction:</strong> TIP automatically parses IPv4 addresses, domains, URLs, and MD5/SHA256 hashes from the alert payload.</li>
+                                <li><strong>3. Risk Scoring & Correlation:</strong> TIP checks external reputation (AbuseIPDB, VirusTotal, OTX) and correlates against past reports and known malware families.</li>
+                                <li><strong>4. Alert Generation:</strong> If an indicator exceeds risk thresholds (score &ge; 75 CRITICAL or 50&ndash;74 HIGH), an incident is prioritized immediately in the Alert Center.</li>
+                                <li><strong>5. Sensor Blocklist:</strong> Firewalls and EDR custom IOC lists consume the <code>/feed/blocklist/plain</code> endpoint to preemptively block bad actors.</li>
+                            </ul>
+
+                            <div class="status-box success-box" style="margin-top: 1.25rem;">
+                                <strong>Integration Authentication Key:</strong>
+                                <p style="word-break: break-all; margin-top: 0.25rem;"><code>{{ api_key }}</code></p>
+                                <small style="color: #94a3b8;">Pass in header: <code>X-API-Key: &lt;YOUR_API_KEY&gt;</code> or <code>Authorization: Bearer &lt;YOUR_API_KEY&gt;</code></small>
+                            </div>
+                        </div>
+                    </article>
+
+                    <!-- Vendor Configuration Examples -->
+                    <article class="profile-card">
+                        <header class="card-header">
+                            <h2 class="card-title">Vendor Ingestion Payloads</h2>
+                        </header>
+                        <div class="card-body">
+                            <p style="color: #94a3b8; margin-bottom: 0.75rem;">Example cURL webhook call from Splunk / Sentinel:</p>
+                            <pre style="background: #0f172a; padding: 1rem; border-radius: 6px; font-size: 0.82rem; overflow-x: auto; color: #38bdf8; border: 1px solid #1e293b;"><code>curl -X POST "{{ host_url }}/api/v1/webhook/alert" \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -d '{
+    "title": "Suspicious C2 Beacon Detected",
+    "source": "Splunk ES",
+    "severity": "Critical",
+    "description": "Connection to 185.10.10.10:4444",
+    "iocs": ["185.10.10.10", "c2-domain.org"]
+  }'</code></pre>
+
+                            <p style="color: #94a3b8; margin-top: 1rem; margin-bottom: 0.5rem;">Dedicated EDR Alert & Telemetry Ingestion (CrowdStrike / Defender):</p>
+                            <pre style="background: #0f172a; padding: 1rem; border-radius: 6px; font-size: 0.82rem; overflow-x: auto; color: #f59e0b; border: 1px solid #1e293b;"><code>curl -X POST "{{ host_url }}/api/v1/edr/alert" \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -d '{
+    "hostname": "FINANCE-WS01",
+    "host_ip": "10.0.4.15",
+    "vendor": "CrowdStrike Falcon",
+    "DetectionName": "Cobalt Strike Beacon In-Memory Execution",
+    "Severity": "Critical",
+    "FileName": "powershell.exe",
+    "ProcessId": 4812,
+    "CommandLine": "powershell.exe -enc aW52b2tlLW1pbWlrYXR6 -c2 185.10.10.10",
+    "SHA256": "44d88612fea8a8f36de82e1278abb02f44d88612fea8a8f36de82e1278abb02f",
+    "MitreTechniques": ["T1059.001", "T1071.001"]
+  }'</code></pre>
+
+                            <p style="color: #94a3b8; margin-top: 1rem; margin-bottom: 0.5rem;">Real-time SIEM IOC Lookup Query:</p>
+                            <pre style="background: #0f172a; padding: 1rem; border-radius: 6px; font-size: 0.82rem; overflow-x: auto; color: #34d399; border: 1px solid #1e293b;"><code>curl -X GET "{{ host_url }}/api/v1/ioc/lookup?indicator=185.10.10.10" \
+  -H "X-API-Key: YOUR_API_KEY"</code></pre>
+
+                            <p style="color: #94a3b8; margin-top: 1rem; margin-bottom: 0.5rem;">Export Threat Intelligence as OASIS STIX 2.1 Bundle (MISP / OpenCTI):</p>
+                            <pre style="background: #0f172a; padding: 1rem; border-radius: 6px; font-size: 0.82rem; overflow-x: auto; color: #c084fc; border: 1px solid #1e293b;"><code>curl -X GET "{{ host_url }}/api/v1/stix/bundle?min_risk=50" \
+  -H "Accept: application/vnd.oasis.stix+json; version=2.1"</code></pre>
+                        </div>
+                    </article>
+
+                </div>
+
+                <!-- Interactive Webhook & Lookup Live Testing Section -->
+                <div class="profile-grid-layout" style="margin-top: 1.5rem;">
+                    
+                    <!-- Webhook Ingest Tester -->
+                    <article class="profile-card">
+                        <header class="card-header">
+                            <h2 class="card-title">Live Webhook Tester (Simulate SIEM/EDR Alert)</h2>
+                        </header>
+                        <div class="card-body">
+                            <form id="webhook-tester-form" class="profile-form">
+                                <div class="form-group">
+                                    <label for="test-vendor" class="form-label">Detection Source / Vendor</label>
+                                    <select id="test-vendor" class="form-select">
+                                        <option value="CrowdStrike Falcon">CrowdStrike Falcon EDR</option>
+                                        <option value="Microsoft Sentinel">Microsoft Sentinel SIEM</option>
+                                        <option value="Splunk ES">Splunk Enterprise Security</option>
+                                        <option value="Defender for Endpoint">Microsoft Defender for Endpoint</option>
+                                        <option value="Custom SIEM">Custom Ingest Webhook</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="test-title" class="form-label">Alert Title</label>
+                                    <input type="text" id="test-title" class="form-input" value="Ransomware C2 Connection Attempt" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="test-severity" class="form-label">Vendor Severity</label>
+                                    <select id="test-severity" class="form-select">
+                                        <option value="Critical" selected>Critical</option>
+                                        <option value="High">High</option>
+                                        <option value="Medium">Medium</option>
+                                        <option value="Low">Low</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="test-desc" class="form-label">Alert Body & Extracted Entities</label>
+                                    <textarea id="test-desc" class="form-textarea" rows="3" style="width: 100%; background: #0f172a; color: #fff; border: 1px solid #334155; border-radius: 4px; padding: 0.5rem;">High risk connection to 185.10.10.10 on port 4444. Drop payload md5: 0123456789abcdef0123456789abcdef and connects to evil-malware-test.com.</textarea>
+                                </div>
+                                <div class="form-actions">
+                                    <button type="button" id="btn-send-webhook" class="btn btn-primary btn-submit">Simulate Ingest &amp; Score</button>
+                                </div>
+                            </form>
+
+                            <div id="webhook-result-box" style="display: none; margin-top: 1rem; padding: 0.75rem; background: #0f172a; border-radius: 4px; border: 1px solid #1e293b;">
+                                <strong style="color: #38bdf8;">Response Payload:</strong>
+                                <pre id="webhook-json-output" style="font-size: 0.8rem; color: #cbd5e1; max-height: 200px; overflow-y: auto; margin-top: 0.5rem;"></pre>
+                            </div>
+                        </div>
+                    </article>
+
+                    <!-- Real-Time IOC Lookup Tester -->
+                    <article class="profile-card">
+                        <header class="card-header">
+                            <h2 class="card-title">Live IOC Lookup Console (Query TIP Intelligence)</h2>
+                        </header>
+                        <div class="card-body">
+                            <form id="ioc-lookup-form" class="profile-form">
+                                <div class="form-group">
+                                    <label for="lookup-ioc-val" class="form-label">Indicator Value (IP, Domain, Hash, URL)</label>
+                                    <input type="text" id="lookup-ioc-val" class="form-input" placeholder="e.g. 185.10.10.10" value="185.10.10.10" required>
+                                </div>
+                                <div class="form-actions">
+                                    <button type="button" id="btn-run-lookup" class="btn btn-secondary">Query Intelligence API</button>
+                                </div>
+                            </form>
+
+                            <div id="lookup-result-box" style="display: none; margin-top: 1rem; padding: 0.75rem; background: #0f172a; border-radius: 4px; border: 1px solid #1e293b;">
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <strong style="color: #34d399;">TIP Intelligence Result:</strong>
+                                    <span id="lookup-rec-badge" class="badge" style="background: #ef4444; color: white;">BLOCK</span>
+                                </div>
+                                <pre id="lookup-json-output" style="font-size: 0.8rem; color: #cbd5e1; max-height: 200px; overflow-y: auto; margin-top: 0.5rem;"></pre>
+                            </div>
+                        </div>
+                    </article>
+
+                    <!-- Dedicated EDR Telemetry & Ingestion Console -->
+                    <article class="profile-card" style="grid-column: 1 / -1; margin-top: 1.5rem;">
+                        <header class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+                            <div>
+                                <h2 class="card-title" style="color: #f59e0b;">&#128737; Live EDR Telemetry &amp; Ingestion Console (CrowdStrike / Defender / SentinelOne)</h2>
+                                <small style="color: #94a3b8;">Simulates endpoint agent detection, process execution tree analysis, and real-time host containment calculation</small>
+                            </div>
+                            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                                <button type="button" class="btn btn-secondary btn-sm" id="btn-preset-crowdstrike" style="font-size: 0.8rem; padding: 0.25rem 0.6rem;">Load CrowdStrike Preset</button>
+                                <button type="button" class="btn btn-secondary btn-sm" id="btn-preset-mde" style="font-size: 0.8rem; padding: 0.25rem 0.6rem;">Load Defender Preset</button>
+                                <button type="button" class="btn btn-secondary btn-sm" id="btn-preset-s1" style="font-size: 0.8rem; padding: 0.25rem 0.6rem;">Load SentinelOne Preset</button>
+                            </div>
+                        </header>
+                        <div class="card-body">
+                            <form id="edr-tester-form" class="profile-form">
+                                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem;">
+                                    <div class="form-group">
+                                        <label for="edr-vendor" class="form-label">EDR Sensor Vendor</label>
+                                        <select id="edr-vendor" class="form-select">
+                                            <option value="CrowdStrike Falcon" selected>CrowdStrike Falcon</option>
+                                            <option value="Microsoft Defender for Endpoint">Microsoft Defender for Endpoint</option>
+                                            <option value="SentinelOne">SentinelOne Singularity</option>
+                                            <option value="VMware Carbon Black">VMware Carbon Black</option>
+                                            <option value="Generic EDR Agent">Generic EDR Agent</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="edr-hostname" class="form-label">Endpoint Hostname</label>
+                                        <input type="text" id="edr-hostname" class="form-input" value="FIN-WS-4412" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="edr-host-ip" class="form-label">Internal Host IP</label>
+                                        <input type="text" id="edr-host-ip" class="form-input" value="10.10.4.52" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="edr-severity" class="form-label">Alert Severity</label>
+                                        <select id="edr-severity" class="form-select">
+                                            <option value="Critical" selected>Critical</option>
+                                            <option value="High">High</option>
+                                            <option value="Medium">Medium</option>
+                                            <option value="Low">Low</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-top: 0.75rem;">
+                                    <div class="form-group">
+                                        <label for="edr-title" class="form-label">Detection Title</label>
+                                        <input type="text" id="edr-title" class="form-input" value="Cobalt Strike In-Memory Beaconing &amp; Injection" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="edr-process-name" class="form-label">Process Name (PID)</label>
+                                        <div style="display: flex; gap: 0.5rem;">
+                                            <input type="text" id="edr-process-name" class="form-input" value="powershell.exe" style="flex: 2;">
+                                            <input type="number" id="edr-pid" class="form-input" value="4812" style="flex: 1;" placeholder="PID">
+                                        </div>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="edr-parent-process" class="form-label">Parent Process</label>
+                                        <input type="text" id="edr-parent-process" class="form-input" value="explorer.exe">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="edr-mitre" class="form-label">MITRE ATT&amp;CK Techniques</label>
+                                        <input type="text" id="edr-mitre" class="form-input" value="T1059.001, T1055, T1071.001">
+                                    </div>
+                                </div>
+
+                                <div class="form-group" style="margin-top: 0.75rem;">
+                                    <label for="edr-cmdline" class="form-label">Process Execution Command Line</label>
+                                    <input type="text" id="edr-cmdline" class="form-input" value="powershell.exe -nop -w hidden -enc aW52b2tlLW1pbWlrYXR6 -server 198.51.100.77 -c2 evil-beacon.com" style="font-family: monospace;">
+                                </div>
+
+                                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; margin-top: 0.75rem;">
+                                    <div class="form-group">
+                                        <label for="edr-filepath" class="form-label">File Path</label>
+                                        <input type="text" id="edr-filepath" class="form-input" value="C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="edr-hash" class="form-label">Binary SHA256 Hash</label>
+                                        <input type="text" id="edr-hash" class="form-input" value="44d88612fea8a8f36de82e1278abb02f44d88612fea8a8f36de82e1278abb02f" style="font-family: monospace;">
+                                    </div>
+                                </div>
+
+                                <div class="form-actions" style="margin-top: 1rem;">
+                                    <button type="button" id="btn-send-edr" class="btn btn-warning btn-submit" style="background: #f59e0b; color: #000; font-weight: bold;">
+                                        &#128737; Ingest EDR Telemetry &amp; Run Analysis
+                                    </button>
+                                </div>
+                            </form>
+
+                            <!-- Results Section -->
+                            <div id="edr-result-box" style="display: none; margin-top: 1.5rem; padding: 1.25rem; background: #0f172a; border-radius: 6px; border: 1px solid #334155;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; border-bottom: 1px solid #1e293b; padding-bottom: 0.75rem;">
+                                    <div>
+                                        <strong style="color: #fbbf24; font-size: 1.1rem;">EDR Telemetry Analyzed:</strong>
+                                        <span id="edr-endpoint-text" style="color: #cbd5e1; margin-left: 0.5rem;"></span>
+                                    </div>
+                                    <span id="edr-containment-badge" class="badge" style="font-size: 0.85rem; padding: 0.35rem 0.8rem;"></span>
+                                </div>
+
+                                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-bottom: 1rem;">
+                                    <div style="background: rgba(15, 23, 42, 0.8); padding: 0.75rem; border-radius: 4px; border: 1px solid #1e293b;">
+                                        <strong style="color: #38bdf8; font-size: 0.85rem; display: block; margin-bottom: 0.35rem;">Remediation Runbook Steps:</strong>
+                                        <ul id="edr-steps-list" style="margin: 0; padding-left: 1.25rem; color: #cbd5e1; font-size: 0.85rem; line-height: 1.6;"></ul>
+                                    </div>
+                                    <div style="background: rgba(15, 23, 42, 0.8); padding: 0.75rem; border-radius: 4px; border: 1px solid #1e293b;">
+                                        <strong style="color: #34d399; font-size: 0.85rem; display: block; margin-bottom: 0.35rem;">Extracted IOCs &amp; Risk Scores:</strong>
+                                        <div id="edr-iocs-list" style="font-size: 0.82rem; color: #cbd5e1;"></div>
+                                    </div>
+                                </div>
+
+                                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.75rem;">
+                                    <span id="edr-alert-link-container"></span>
+                                    <button type="button" id="btn-toggle-edr-json" class="btn btn-secondary btn-sm" style="font-size: 0.75rem;">Toggle Raw JSON</button>
+                                </div>
+                                <pre id="edr-json-output" style="display: none; font-size: 0.8rem; color: #cbd5e1; max-height: 250px; overflow-y: auto; margin-top: 0.75rem; padding: 0.5rem; background: #020617; border-radius: 4px; border: 1px solid #1e293b;"></pre>
+                            </div>
+                        </div>
+                    </article>
+
+                    <!-- Automated Threat Intelligence Blocklist Feeds Console (Task 11) -->
+                    <article class="profile-card" style="grid-column: 1 / -1; margin-top: 1.5rem;">
+                        <header class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+                            <div>
+                                <h2 class="card-title" style="color: #ef4444;">&#128737; Multi-Vendor IOC Blocklist Feeds &amp; Sensor Export</h2>
+                                <small style="color: #94a3b8;">Automated threat feeds for Firewalls (Palo Alto, Fortinet, pfSense), DNS Sinkholes (Pi-hole, AdGuard), BIND9 RPZ, Suricata/Snort IDS, and SIEM CSV lookup tables</small>
+                            </div>
+                            <div style="display: flex; gap: 0.5rem; align-items: center;">
+                                <span class="badge" style="background: #10b981; color: white; font-size: 0.75rem;">ETag 304 Caching Enabled</span>
+                                <button type="button" id="btn-refresh-bl-stats" class="btn btn-secondary btn-sm" style="font-size: 0.8rem; padding: 0.25rem 0.6rem;">&#8635; Refresh Stats</button>
+                            </div>
+                        </header>
+                        <div class="card-body">
+                            <!-- Live Blocklist Statistics Bar -->
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; background: #0f172a; padding: 1rem; border-radius: 6px; border: 1px solid #1e293b;">
+                                <div>
+                                    <span style="font-size: 0.75rem; color: #94a3b8; text-transform: uppercase;">Total Active Indicators</span>
+                                    <div id="bl-stat-total" style="font-size: 1.4rem; font-weight: 700; color: #38bdf8;">--</div>
+                                </div>
+                                <div>
+                                    <span style="font-size: 0.75rem; color: #94a3b8; text-transform: uppercase;">High-Risk Blocked (&ge;50)</span>
+                                    <div id="bl-stat-high" style="font-size: 1.4rem; font-weight: 700; color: #f59e0b;">--</div>
+                                </div>
+                                <div>
+                                    <span style="font-size: 0.75rem; color: #94a3b8; text-transform: uppercase;">Critical Blocked (&ge;75)</span>
+                                    <div id="bl-stat-critical" style="font-size: 1.4rem; font-weight: 700; color: #ef4444;">--</div>
+                                </div>
+                                <div>
+                                    <span style="font-size: 0.75rem; color: #94a3b8; text-transform: uppercase;">Blocked Type Distribution</span>
+                                    <div id="bl-stat-breakdown" style="font-size: 0.85rem; color: #cbd5e1; margin-top: 0.25rem;">Loading...</div>
+                                </div>
+                            </div>
+
+                            <!-- Endpoints Directory Table -->
+                            <h3 style="font-size: 1rem; color: #f1f5f9; margin-bottom: 0.75rem;">Perimeter Sensor Feed Catalog</h3>
+                            <div style="overflow-x: auto; margin-bottom: 1.5rem;">
+                                <table class="data-table" style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
+                                    <thead>
+                                        <tr style="background: #1e293b; color: #94a3b8; text-align: left;">
+                                            <th style="padding: 0.6rem;">Feed Target</th>
+                                            <th style="padding: 0.6rem;">Format</th>
+                                            <th style="padding: 0.6rem;">Automated Endpoint URL</th>
+                                            <th style="padding: 0.6rem;">Supported Platforms</th>
+                                            <th style="padding: 0.6rem;">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody style="color: #cbd5e1;">
+                                        <tr style="border-bottom: 1px solid #1e293b;">
+                                            <td style="padding: 0.6rem; font-weight: 600; color: #ef4444;">IP Address Blocklist</td>
+                                            <td style="padding: 0.6rem;"><span class="badge" style="background: #334155;">Plaintext</span></td>
+                                            <td style="padding: 0.6rem;"><code style="color: #38bdf8;">/api/v1/blocklist/ip</code></td>
+                                            <td style="padding: 0.6rem;">Palo Alto EDL, Fortinet Threat Feed, pfSense pfBlockerNG, Check Point</td>
+                                            <td style="padding: 0.6rem; white-space: nowrap;">
+                                                <a href="/api/v1/blocklist/ip" target="_blank" class="btn btn-secondary btn-sm" style="font-size: 0.75rem; padding: 0.2rem 0.5rem; text-decoration: none;">Open</a>
+                                                <button type="button" class="btn btn-secondary btn-sm btn-copy-feed" data-url="/api/v1/blocklist/ip" style="font-size: 0.75rem; padding: 0.2rem 0.5rem;">Copy URL</button>
+                                            </td>
+                                        </tr>
+                                        <tr style="border-bottom: 1px solid #1e293b;">
+                                            <td style="padding: 0.6rem; font-weight: 600; color: #f59e0b;">Domain Name Blocklist</td>
+                                            <td style="padding: 0.6rem;"><span class="badge" style="background: #334155;">Plaintext</span></td>
+                                            <td style="padding: 0.6rem;"><code style="color: #38bdf8;">/api/v1/blocklist/domains</code></td>
+                                            <td style="padding: 0.6rem;">DNS Firewalls, Next-Gen Firewalls, Web Application Firewalls</td>
+                                            <td style="padding: 0.6rem; white-space: nowrap;">
+                                                <a href="/api/v1/blocklist/domains" target="_blank" class="btn btn-secondary btn-sm" style="font-size: 0.75rem; padding: 0.2rem 0.5rem; text-decoration: none;">Open</a>
+                                                <button type="button" class="btn btn-secondary btn-sm btn-copy-feed" data-url="/api/v1/blocklist/domains" style="font-size: 0.75rem; padding: 0.2rem 0.5rem;">Copy URL</button>
+                                            </td>
+                                        </tr>
+                                        <tr style="border-bottom: 1px solid #1e293b;">
+                                            <td style="padding: 0.6rem; font-weight: 600; color: #f59e0b;">Proxy URL Blocklist</td>
+                                            <td style="padding: 0.6rem;"><span class="badge" style="background: #334155;">Plaintext</span></td>
+                                            <td style="padding: 0.6rem;"><code style="color: #38bdf8;">/api/v1/blocklist/urls</code></td>
+                                            <td style="padding: 0.6rem;">Squid Proxy, Zscaler Internet Access, BlueCoat / Broadcom ProxySG</td>
+                                            <td style="padding: 0.6rem; white-space: nowrap;">
+                                                <a href="/api/v1/blocklist/urls" target="_blank" class="btn btn-secondary btn-sm" style="font-size: 0.75rem; padding: 0.2rem 0.5rem; text-decoration: none;">Open</a>
+                                                <button type="button" class="btn btn-secondary btn-sm btn-copy-feed" data-url="/api/v1/blocklist/urls" style="font-size: 0.75rem; padding: 0.2rem 0.5rem;">Copy URL</button>
+                                            </td>
+                                        </tr>
+                                        <tr style="border-bottom: 1px solid #1e293b;">
+                                            <td style="padding: 0.6rem; font-weight: 600; color: #a855f7;">EDR Custom File Hashes</td>
+                                            <td style="padding: 0.6rem;"><span class="badge" style="background: #334155;">Plaintext</span></td>
+                                            <td style="padding: 0.6rem;"><code style="color: #38bdf8;">/api/v1/blocklist/hashes</code></td>
+                                            <td style="padding: 0.6rem;">CrowdStrike Falcon Custom IOCs, Microsoft Defender, SentinelOne</td>
+                                            <td style="padding: 0.6rem; white-space: nowrap;">
+                                                <a href="/api/v1/blocklist/hashes" target="_blank" class="btn btn-secondary btn-sm" style="font-size: 0.75rem; padding: 0.2rem 0.5rem; text-decoration: none;">Open</a>
+                                                <button type="button" class="btn btn-secondary btn-sm btn-copy-feed" data-url="/api/v1/blocklist/hashes" style="font-size: 0.75rem; padding: 0.2rem 0.5rem;">Copy URL</button>
+                                            </td>
+                                        </tr>
+                                        <tr style="border-bottom: 1px solid #1e293b;">
+                                            <td style="padding: 0.6rem; font-weight: 600; color: #3b82f6;">DNS Sinkhole Hosts File</td>
+                                            <td style="padding: 0.6rem;"><span class="badge" style="background: #334155;">Hosts / DNS</span></td>
+                                            <td style="padding: 0.6rem;"><code style="color: #38bdf8;">/api/v1/blocklist/hosts?ip=0.0.0.0</code></td>
+                                            <td style="padding: 0.6rem;">Pi-hole, AdGuard Home, dnsmasq, unbound, OS /etc/hosts</td>
+                                            <td style="padding: 0.6rem; white-space: nowrap;">
+                                                <a href="/api/v1/blocklist/hosts" target="_blank" class="btn btn-secondary btn-sm" style="font-size: 0.75rem; padding: 0.2rem 0.5rem; text-decoration: none;">Open</a>
+                                                <button type="button" class="btn btn-secondary btn-sm btn-copy-feed" data-url="/api/v1/blocklist/hosts" style="font-size: 0.75rem; padding: 0.2rem 0.5rem;">Copy URL</button>
+                                            </td>
+                                        </tr>
+                                        <tr style="border-bottom: 1px solid #1e293b;">
+                                            <td style="padding: 0.6rem; font-weight: 600; color: #3b82f6;">DNS RPZ Policy Zone</td>
+                                            <td style="padding: 0.6rem;"><span class="badge" style="background: #334155;">BIND9 RPZ</span></td>
+                                            <td style="padding: 0.6rem;"><code style="color: #38bdf8;">/api/v1/blocklist/rpz?zone=rpz.tip.local</code></td>
+                                            <td style="padding: 0.6rem;">BIND 9.x, PowerDNS Recurser, Infoblox BloxOne Threat Defense</td>
+                                            <td style="padding: 0.6rem; white-space: nowrap;">
+                                                <a href="/api/v1/blocklist/rpz" target="_blank" class="btn btn-secondary btn-sm" style="font-size: 0.75rem; padding: 0.2rem 0.5rem; text-decoration: none;">Open</a>
+                                                <button type="button" class="btn btn-secondary btn-sm btn-copy-feed" data-url="/api/v1/blocklist/rpz" style="font-size: 0.75rem; padding: 0.2rem 0.5rem;">Copy URL</button>
+                                            </td>
+                                        </tr>
+                                        <tr style="border-bottom: 1px solid #1e293b;">
+                                            <td style="padding: 0.6rem; font-weight: 600; color: #10b981;">Suricata / Snort Rules</td>
+                                            <td style="padding: 0.6rem;"><span class="badge" style="background: #334155;">IDS Rules</span></td>
+                                            <td style="padding: 0.6rem;"><code style="color: #38bdf8;">/api/v1/blocklist/suricata?sid=1900000</code></td>
+                                            <td style="padding: 0.6rem;">Suricata IDS/IPS, Snort 2.x/3.x, Zeek / Bro integration scripts</td>
+                                            <td style="padding: 0.6rem; white-space: nowrap;">
+                                                <a href="/api/v1/blocklist/suricata" target="_blank" class="btn btn-secondary btn-sm" style="font-size: 0.75rem; padding: 0.2rem 0.5rem; text-decoration: none;">Open</a>
+                                                <button type="button" class="btn btn-secondary btn-sm btn-copy-feed" data-url="/api/v1/blocklist/suricata" style="font-size: 0.75rem; padding: 0.2rem 0.5rem;">Copy URL</button>
+                                            </td>
+                                        </tr>
+                                        <tr style="border-bottom: 1px solid #1e293b;">
+                                            <td style="padding: 0.6rem; font-weight: 600; color: #06b6d4;">SIEM Metadata CSV</td>
+                                            <td style="padding: 0.6rem;"><span class="badge" style="background: #334155;">RFC 4180 CSV</span></td>
+                                            <td style="padding: 0.6rem;"><code style="color: #38bdf8;">/api/v1/blocklist/csv</code></td>
+                                            <td style="padding: 0.6rem;">Splunk Enterprise Security Lookup, Microsoft Sentinel Watchlists, QRadar</td>
+                                            <td style="padding: 0.6rem; white-space: nowrap;">
+                                                <a href="/api/v1/blocklist/csv" target="_blank" class="btn btn-secondary btn-sm" style="font-size: 0.75rem; padding: 0.2rem 0.5rem; text-decoration: none;">Open</a>
+                                                <button type="button" class="btn btn-secondary btn-sm btn-copy-feed" data-url="/api/v1/blocklist/csv" style="font-size: 0.75rem; padding: 0.2rem 0.5rem;">Copy URL</button>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <!-- Interactive Blocklist Feed Generator & Preview Tool -->
+                            <div style="background: #090d16; border: 1px solid #1e293b; border-radius: 6px; padding: 1rem;">
+                                <h4 style="font-size: 0.95rem; color: #f1f5f9; margin-bottom: 0.75rem;">Interactive Feed Tester &amp; ETag Validation</h4>
+                                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+                                    <div class="form-group">
+                                        <label for="bl-feed-select" class="form-label">Feed Endpoint</label>
+                                        <select id="bl-feed-select" class="form-select">
+                                            <option value="/api/v1/blocklist/ip">IP Address Blocklist (/ip)</option>
+                                            <option value="/api/v1/blocklist/domains">Domain Blocklist (/domains)</option>
+                                            <option value="/api/v1/blocklist/urls">URL Blocklist (/urls)</option>
+                                            <option value="/api/v1/blocklist/hashes">File Hashes (/hashes)</option>
+                                            <option value="/api/v1/blocklist/hosts">DNS Sinkhole Hosts (/hosts)</option>
+                                            <option value="/api/v1/blocklist/rpz">BIND9 RPZ Zone (/rpz)</option>
+                                            <option value="/api/v1/blocklist/suricata">Suricata/Snort Rules (/suricata)</option>
+                                            <option value="/api/v1/blocklist/csv">SIEM Metadata CSV (/csv)</option>
+                                            <option value="/api/v1/feed/blocklist">Legacy JSON Feed (/feed/blocklist)</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="bl-min-risk" class="form-label">Minimum Risk Score</label>
+                                        <input type="number" id="bl-min-risk" class="form-input" value="50" min="0" max="100">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="bl-severity" class="form-label">Severity Filter</label>
+                                        <select id="bl-severity" class="form-select">
+                                            <option value="all" selected>All Severities</option>
+                                            <option value="critical">Critical Only</option>
+                                            <option value="high">High Only</option>
+                                            <option value="medium">Medium Only</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="bl-comments" class="form-label">Include Comments / Headers</label>
+                                        <select id="bl-comments" class="form-select">
+                                            <option value="true" selected>Yes (Comments included)</option>
+                                            <option value="false">No (Pure IOC list)</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 1rem;">
+                                    <button type="button" id="btn-fetch-feed" class="btn btn-primary btn-sm">&#9654; Fetch Feed Content</button>
+                                    <button type="button" id="btn-test-etag" class="btn btn-secondary btn-sm">&#9889; Test Conditional GET (ETag 304)</button>
+                                </div>
+
+                                <!-- Preview Box -->
+                                <div id="bl-preview-container" style="display: none; margin-top: 1rem; padding: 0.75rem; background: #020617; border-radius: 4px; border: 1px solid #1e293b;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.5rem;">
+                                        <div style="display: flex; gap: 0.5rem; align-items: center;">
+                                            <span id="bl-status-badge" class="badge" style="background: #10b981; color: white;">200 OK</span>
+                                            <small id="bl-etag-info" style="color: #94a3b8; font-family: monospace;">ETag: --</small>
+                                        </div>
+                                        <span id="bl-content-type" style="color: #64748b; font-size: 0.75rem;">Content-Type: text/plain</span>
+                                    </div>
+                                    <pre id="bl-preview-output" style="font-size: 0.8rem; color: #cbd5e1; max-height: 250px; overflow-y: auto; background: #0b1120; padding: 0.75rem; border-radius: 4px; font-family: monospace; white-space: pre; margin: 0;"></pre>
+                                </div>
+                            </div>
+                        </div>
+                    </article>
+
+                </div>
+
+            </section>
+
+        </main>
+    </div>
+
+    <script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const apiKey = "{{ current_user.api_key or '' }}";
+
+        // Webhook Tester
+        const btnWebhook = document.getElementById("btn-send-webhook");
+        if (btnWebhook) {
+            btnWebhook.addEventListener("click", async function() {
+                if (!apiKey) {
+                    alert("No personal API key provisioned on your analyst profile. Please go to your Profile page and generate an API key to test live webhook simulation.");
+                    return;
+                }
+                btnWebhook.disabled = true;
+                btnWebhook.textContent = "Ingesting & Analyzing...";
+                const vendor = document.getElementById("test-vendor").value;
+                const title = document.getElementById("test-title").value;
+                const severity = document.getElementById("test-severity").value;
+                const desc = document.getElementById("test-desc").value;
+
+                try {
+                    const resp = await fetch("/api/v1/webhook/alert", {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                            "X-API-Key": apiKey
+                        },
+                        body: JSON.stringify({
+                            source: vendor,
+                            title: title,
+                            severity: severity,
+                            description: desc
+                        })
+                    });
+                    const data = await resp.json();
+                    document.getElementById("webhook-result-box").style.display = "block";
+                    document.getElementById("webhook-json-output").textContent = JSON.stringify(data, null, 2);
+                } catch(err) {
+                    alert("Error sending webhook: " + err);
+                } finally {
+                    btnWebhook.disabled = false;
+                    btnWebhook.textContent = "Simulate Ingest & Score";
+                }
+            });
+        }
+
+        // IOC Lookup Tester
+        const btnLookup = document.getElementById("btn-run-lookup");
+        if (btnLookup) {
+            btnLookup.addEventListener("click", async function() {
+                const iocVal = document.getElementById("lookup-ioc-val").value.trim();
+                if (!iocVal) return;
+                if (!apiKey) {
+                    alert("No personal API key provisioned on your analyst profile. Please go to your Profile page and generate an API key to test live IOC lookups.");
+                    return;
+                }
+                btnLookup.disabled = true;
+                btnLookup.textContent = "Querying...";
+
+                try {
+                    const resp = await fetch("/api/v1/ioc/lookup?indicator=" + encodeURIComponent(iocVal), {
+                        headers: {
+                            "X-API-Key": apiKey
+                        }
+                    });
+                    const data = await resp.json();
+                    document.getElementById("lookup-result-box").style.display = "block";
+                    document.getElementById("lookup-json-output").textContent = JSON.stringify(data, null, 2);
+
+                    const badge = document.getElementById("lookup-rec-badge");
+                    if (data.recommendation) {
+                        badge.textContent = data.recommendation;
+                        if (data.recommendation === "BLOCK") {
+                            badge.style.background = "#ef4444";
+                        } else if (data.recommendation === "INVESTIGATE") {
+                            badge.style.background = "#f59e0b";
+                        } else {
+                            badge.style.background = "#10b981";
+                        }
+                    }
+                } catch(err) {
+                    alert("Error looking up IOC: " + err);
+                } finally {
+                    btnLookup.disabled = false;
+                    btnLookup.textContent = "Query Intelligence API";
+                }
+            });
+        }
+
+        // EDR Preset Loaders
+        const pCS = document.getElementById("btn-preset-crowdstrike");
+        if (pCS) {
+            pCS.addEventListener("click", function() {
+                document.getElementById("edr-vendor").value = "CrowdStrike Falcon";
+                document.getElementById("edr-hostname").value = "CORP-FIN-01";
+                document.getElementById("edr-host-ip").value = "10.0.4.15";
+                document.getElementById("edr-severity").value = "Critical";
+                document.getElementById("edr-title").value = "Cobalt Strike Beacon In-Memory Execution";
+                document.getElementById("edr-process-name").value = "powershell.exe";
+                document.getElementById("edr-pid").value = "4812";
+                document.getElementById("edr-parent-process").value = "explorer.exe";
+                document.getElementById("edr-mitre").value = "T1059.001, T1055, T1071.001";
+                document.getElementById("edr-cmdline").value = "powershell.exe -enc aW52b2tlLW1pbWlrYXR6 -server 198.51.100.77";
+                document.getElementById("edr-filepath").value = "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe";
+                document.getElementById("edr-hash").value = "44d88612fea8a8f36de82e1278abb02f44d88612fea8a8f36de82e1278abb02f";
+            });
+        }
+
+        const pMDE = document.getElementById("btn-preset-mde");
+        if (pMDE) {
+            pMDE.addEventListener("click", function() {
+                document.getElementById("edr-vendor").value = "Microsoft Defender for Endpoint";
+                document.getElementById("edr-hostname").value = "SRV-DC-02.domain.local";
+                document.getElementById("edr-host-ip").value = "192.168.1.10";
+                document.getElementById("edr-severity").value = "High";
+                document.getElementById("edr-title").value = "Mimikatz LSASS Memory Dump Attempt";
+                document.getElementById("edr-process-name").value = "procdump.exe";
+                document.getElementById("edr-pid").value = "5504";
+                document.getElementById("edr-parent-process").value = "cmd.exe";
+                document.getElementById("edr-mitre").value = "T1003.001";
+                document.getElementById("edr-cmdline").value = "procdump.exe -ma lsass.exe C:\\Temp\\lsass.dmp -upload 203.0.113.88";
+                document.getElementById("edr-filepath").value = "C:\\Tools\\procdump.exe";
+                document.getElementById("edr-hash").value = "a1b2c3d4e5f60718293a4b5c6d7e8f90";
+            });
+        }
+
+        const pS1 = document.getElementById("btn-preset-s1");
+        if (pS1) {
+            pS1.addEventListener("click", function() {
+                document.getElementById("edr-vendor").value = "SentinelOne";
+                document.getElementById("edr-hostname").value = "WS-ENG-89";
+                document.getElementById("edr-host-ip").value = "172.16.20.88";
+                document.getElementById("edr-severity").value = "High";
+                document.getElementById("edr-title").value = "Suspicious WScript Macro Execution";
+                document.getElementById("edr-process-name").value = "wscript.exe";
+                document.getElementById("edr-pid").value = "6190";
+                document.getElementById("edr-parent-process").value = "WINWORD.EXE";
+                document.getElementById("edr-mitre").value = "T1059.005, T1204.002";
+                document.getElementById("edr-cmdline").value = "wscript.exe C:\\Users\\Public\\dropper.vbs http://198.51.100.77/beacon.ps1";
+                document.getElementById("edr-filepath").value = "C:\\Windows\\System32\\wscript.exe";
+                document.getElementById("edr-hash").value = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+            });
+        }
+
+        // EDR Telemetry Ingest Tester
+        const btnEdr = document.getElementById("btn-send-edr");
+        if (btnEdr) {
+            btnEdr.addEventListener("click", async function() {
+                btnEdr.disabled = true;
+                btnEdr.textContent = "Ingesting & Computing Containment...";
+
+                const payload = {
+                    vendor: document.getElementById("edr-vendor").value,
+                    hostname: document.getElementById("edr-hostname").value.trim(),
+                    host_ip: document.getElementById("edr-host-ip").value.trim(),
+                    severity: document.getElementById("edr-severity").value,
+                    title: document.getElementById("edr-title").value.trim(),
+                    process_name: document.getElementById("edr-process-name").value.trim(),
+                    process_id: parseInt(document.getElementById("edr-pid").value) || 0,
+                    parent_process: document.getElementById("edr-parent-process").value.trim(),
+                    mitre_techniques: document.getElementById("edr-mitre").value.split(",").map(t => t.trim()).filter(Boolean),
+                    command_line: document.getElementById("edr-cmdline").value.trim(),
+                    file_path: document.getElementById("edr-filepath").value.trim(),
+                    sha256: document.getElementById("edr-hash").value.trim(),
+                };
+
+                try {
+                    const resp = await fetch("/api/v1/edr/alert", {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                            "X-API-Key": apiKey
+                        },
+                        body: JSON.stringify(payload)
+                    });
+                    const data = await resp.json();
+                    
+                    const resultBox = document.getElementById("edr-result-box");
+                    resultBox.style.display = "block";
+                    
+                    document.getElementById("edr-endpoint-text").textContent = 
+                        `${data.endpoint.hostname} (${data.endpoint.host_ip}) &bull; ${data.endpoint.sensor_vendor}`;
+
+                    const badge = document.getElementById("edr-containment-badge");
+                    const contAction = data.containment ? data.containment.containment_action : "MONITOR";
+                    badge.textContent = "Action: " + contAction;
+                    if (contAction === "ISOLATE_HOST") {
+                        badge.style.background = "#ef4444";
+                        badge.style.color = "#ffffff";
+                    } else if (contAction === "KILL_PROCESS_AND_QUARANTINE") {
+                        badge.style.background = "#f59e0b";
+                        badge.style.color = "#000000";
+                    } else {
+                        badge.style.background = "#10b981";
+                        badge.style.color = "#ffffff";
+                    }
+
+                    // Steps
+                    const stepsUl = document.getElementById("edr-steps-list");
+                    stepsUl.innerHTML = "";
+                    if (data.containment && data.containment.remediation_steps) {
+                        data.containment.remediation_steps.forEach(st => {
+                            const li = document.createElement("li");
+                            li.textContent = st;
+                            stepsUl.appendChild(li);
+                        });
+                    }
+
+                    // IOCs
+                    const iocsDiv = document.getElementById("edr-iocs-list");
+                    iocsDiv.innerHTML = "";
+                    if (data.iocs && data.iocs.indicators && data.iocs.indicators.length > 0) {
+                        data.iocs.indicators.forEach(ind => {
+                            const p = document.createElement("div");
+                            p.style.marginBottom = "0.25rem";
+                            p.innerHTML = `<code style="color: #38bdf8;">${ind.value}</code> (${ind.type}) &bull; Risk: <strong>${ind.risk_score}/100</strong> [${ind.risk_level}]`;
+                            iocsDiv.appendChild(p);
+                        });
+                    } else {
+                        iocsDiv.textContent = "No IOCs extracted from command line / artifacts.";
+                    }
+
+                    // Link to created alert
+                    const linkSpan = document.getElementById("edr-alert-link-container");
+                    if (data.alert && data.alert.id) {
+                        linkSpan.innerHTML = `<a href="/alert/${data.alert.id}" class="btn btn-primary btn-sm" style="font-size: 0.8rem; text-decoration: none;">View Incident Alert #AL-${data.alert.id} in Alert Center &rarr;</a>`;
+                    } else {
+                        linkSpan.innerHTML = "";
+                    }
+
+                    // Raw JSON output
+                    document.getElementById("edr-json-output").textContent = JSON.stringify(data, null, 2);
+
+                } catch(err) {
+                    alert("Error ingesting EDR alert: " + err);
+                } finally {
+                    btnEdr.disabled = false;
+                    btnEdr.textContent = "\uD83D\uDEE1\uFE0F Ingest EDR Telemetry & Run Analysis";
+                }
+            });
+        }
+
+        const btnToggleJson = document.getElementById("btn-toggle-edr-json");
+        if (btnToggleJson) {
+            btnToggleJson.addEventListener("click", function() {
+                const pre = document.getElementById("edr-json-output");
+                pre.style.display = pre.style.display === "none" ? "block" : "none";
+            });
+        }
+
+        // =========================================================================
+        // BLOCKLIST FEEDS JAVASCRIPT LOGIC (Task 11)
+        // =========================================================================
+        let lastBlocklistETag = "";
+        let lastBlocklistUrl = "";
+
+        // Copy Feed URL Helper
+        document.querySelectorAll(".btn-copy-feed").forEach(btn => {
+            btn.addEventListener("click", function() {
+                const feedPath = this.getAttribute("data-url");
+                const fullUrl = window.location.origin + feedPath;
+                navigator.clipboard.writeText(fullUrl).then(() => {
+                    const originalText = this.textContent;
+                    this.textContent = "Copied!";
+                    this.style.background = "#10b981";
+                    this.style.color = "#ffffff";
+                    setTimeout(() => {
+                        this.textContent = originalText;
+                        this.style.background = "";
+                        this.style.color = "";
+                    }, 2000);
+                }).catch(err => {
+                    prompt("Copy feed URL:", fullUrl);
+                });
+            });
+        });
+
+        // Load Blocklist Statistics
+        async function loadBlocklistStats() {
+            try {
+                const resp = await fetch("/api/v1/blocklist/stats");
+                if (!resp.ok) return;
+                const stats = await resp.json();
+                document.getElementById("bl-stat-total").textContent = stats.total_active_indicators || 0;
+                document.getElementById("bl-stat-high").textContent = stats.high_risk_blocked_total || 0;
+                document.getElementById("bl-stat-critical").textContent = stats.critical_risk_blocked_total || 0;
+
+                const breakdown = stats.type_breakdown || {};
+                const parts = Object.entries(breakdown).map(([k, v]) => `${k.toUpperCase()}: ${v}`);
+                document.getElementById("bl-stat-breakdown").textContent = parts.length > 0 ? parts.join(" \u2022 ") : "No high-risk indicators";
+            } catch (err) {
+                console.error("Error loading blocklist stats:", err);
+            }
+        }
+
+        const btnRefreshBl = document.getElementById("btn-refresh-bl-stats");
+        if (btnRefreshBl) {
+            btnRefreshBl.addEventListener("click", loadBlocklistStats);
+        }
+
+        // Fetch Blocklist Feed Preview
+        const btnFetchFeed = document.getElementById("btn-fetch-feed");
+        if (btnFetchFeed) {
+            btnFetchFeed.addEventListener("click", async function() {
+                const endpoint = document.getElementById("bl-feed-select").value;
+                const minRisk = document.getElementById("bl-min-risk").value;
+                const severity = document.getElementById("bl-severity").value;
+                const comments = document.getElementById("bl-comments").value;
+
+                let url = `${endpoint}?min_risk=${encodeURIComponent(minRisk)}&comments=${encodeURIComponent(comments)}`;
+                if (severity && severity !== "all") {
+                    url += `&severity=${encodeURIComponent(severity)}`;
+                }
+
+                lastBlocklistUrl = url;
+                btnFetchFeed.disabled = true;
+                btnFetchFeed.textContent = "Fetching Feed...";
+
+                try {
+                    const resp = await fetch(url);
+                    const statusBadge = document.getElementById("bl-status-badge");
+                    statusBadge.textContent = `${resp.status} ${resp.statusText || 'OK'}`;
+                    statusBadge.style.background = resp.status === 200 ? "#10b981" : (resp.status === 304 ? "#3b82f6" : "#ef4444");
+
+                    const etag = resp.headers.get("ETag") || "N/A";
+                    lastBlocklistETag = etag;
+                    document.getElementById("bl-etag-info").textContent = `ETag: ${etag}`;
+
+                    const ctype = resp.headers.get("Content-Type") || "text/plain";
+                    document.getElementById("bl-content-type").textContent = `Content-Type: ${ctype}`;
+
+                    const bodyText = await resp.text();
+                    document.getElementById("bl-preview-output").textContent = bodyText || "(Empty response body)";
+                    document.getElementById("bl-preview-container").style.display = "block";
+                } catch (err) {
+                    alert("Error fetching feed: " + err);
+                } finally {
+                    btnFetchFeed.disabled = false;
+                    btnFetchFeed.textContent = "\u25B6 Fetch Feed Content";
+                }
+            });
+        }
+
+        // Test Conditional GET (ETag 304)
+        const btnTestEtag = document.getElementById("btn-test-etag");
+        if (btnTestEtag) {
+            btnTestEtag.addEventListener("click", async function() {
+                if (!lastBlocklistETag || lastBlocklistETag === "N/A") {
+                    alert("Please fetch the feed content first to generate an ETag header.");
+                    return;
+                }
+
+                btnTestEtag.disabled = true;
+                btnTestEtag.textContent = "Testing 304 Caching...";
+
+                try {
+                    const resp = await fetch(lastBlocklistUrl, {
+                        headers: {
+                            "If-None-Match": lastBlocklistETag
+                        }
+                    });
+
+                    const statusBadge = document.getElementById("bl-status-badge");
+                    statusBadge.textContent = `${resp.status} ${resp.status === 304 ? "304 Not Modified (Cached!)" : resp.statusText}`;
+                    statusBadge.style.background = resp.status === 304 ? "#3b82f6" : "#10b981";
+
+                    if (resp.status === 304) {
+                        document.getElementById("bl-preview-output").textContent = 
+                            `[HTTP 304 Not Modified]\nClient ETag matched server checksum (${lastBlocklistETag}).\nNo bandwidth consumed! Zero bytes transferred over the wire.`;
+                    } else {
+                        const bodyText = await resp.text();
+                        document.getElementById("bl-preview-output").textContent = bodyText;
+                    }
+                    document.getElementById("bl-preview-container").style.display = "block";
+                } catch (err) {
+                    alert("Error executing conditional GET: " + err);
+                } finally {
+                    btnTestEtag.disabled = false;
+                    btnTestEtag.textContent = "\u26A1 Test Conditional GET (ETag 304)";
+                }
+            });
+        }
+
+        // Initialize blocklist stats on page load
+        loadBlocklistStats();
+    });
+    </script>
+</body>
+</html>

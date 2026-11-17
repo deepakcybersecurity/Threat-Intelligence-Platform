@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Upload Threat Report. Publish incident reports, indicators of compromise lists, malware binaries, and security audits to the platform database.">
+    <title>Upload Threat Report - Threat Intelligence Platform</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="{{ url_for('static', filename='js/1-funtioning.js') }}" defer></script>
+</head>
+<body class="dashboard-page">
+
+    <!-- Top Navigation Header -->
+    <header class="main-header">
+        <nav class="navbar dashboard-navbar" aria-label="Main Navigation">
+            <div class="navbar-brand">
+                <a href="{{ url_for('main.home') }}" class="logo-link">
+                    <span class="logo-icon">&#128737;</span>
+                    <span class="logo-text">ThreatIntel Platform</span>
+                </a>
+            </div>
+
+            <!-- Global Quick Search -->
+            <div class="navbar-search">
+                <form action="{{ url_for('dashboard.search_threats') }}" method="GET" class="search-form">
+                    <label for="global-search" class="visually-hidden">Search threats, IPs, hashes</label>
+                    <input type="search" id="global-search" name="query" class="search-input" placeholder="Search threats, IPs, CVEs...">
+                    <button type="submit" class="search-button">Search</button>
+                </form>
+            </div>
+
+            <div class="navbar-user-menu">
+                <span class="user-role badge-critical">SecOps Admin</span>
+                <a href="{{ url_for('dashboard.profile') }}" class="user-profile-link">Profile Settings</a>
+                <a href="{{ url_for('auth.login') }}" class="logout-link">Sign Out</a>
+            </div>
+        </nav>
+    </header>
+
+    <div class="layout-container">
+        
+        <!-- Left Sidebar Navigation -->
+        <aside class="sidebar" aria-label="Sidebar Navigation">
+            <nav class="sidebar-navigation">
+                <ul class="sidebar-menu">
+                    <li><a href="{{ url_for('dashboard.dashboard') }}" class="menu-item">Dashboard Overview</a></li>
+                    <li><a href="{{ url_for('dashboard.threat_feed') }}" class="menu-item">Live Threat Feed</a></li>
+                    <li><a href="{{ url_for('dashboard.ip_checker') }}" class="menu-item">IP Address Checker</a></li>
+                    <li><a href="{{ url_for('dashboard.malware_info') }}" class="menu-item">Malware Information</a></li>
+                    <li><a href="{{ url_for('dashboard.threat_report_upload') }}" class="menu-item active-menu-item">Upload Threat Report</a></li>
+                    <li><a href="{{ url_for('dashboard.search_threats') }}" class="menu-item">Search Threats Database</a></li>
+                    <li><a href="{{ url_for('dashboard.alerts') }}" class="menu-item">Alerts & Notifications</a></li>
+                    <li><a href="{{ url_for('admin.admin') }}" class="menu-item">System Admin Panel</a></li>
+                </ul>
+            </nav>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="dashboard-main-content">
+            
+            <section class="report-upload-section" aria-labelledby="report-upload-heading">
+                <header class="section-header">
+                    <h1 id="report-upload-heading" class="page-title">Upload Security Threat Report</h1>
+                    <p class="page-subtitle">Publish local forensic files, packet capture files, STIX 2.1 documents, or vulnerability sheets directly to intelligence logs</p>
+                </header>
+
+                <div class="report-layout-grid">
+                    
+                    <!-- Form Area -->
+                    <article class="form-wrapper-card">
+                        <header class="card-header">
+                            <h2 class="card-title">Threat Report Submission Form</h2>
+                        </header>
+
+                        <form action="{{ url_for('dashboard.threat_report_upload') }}" method="POST" enctype="multipart/form-data" class="upload-form">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <fieldset class="form-fieldset">
+                                <legend class="visually-hidden">Report Metadata and Binary Files</legend>
+                                
+                                <div class="form-group">
+                                    <label for="report-title" class="form-label">Incident / Report Title</label>
+                                    <input type="text" id="report-title" name="title" class="form-input" 
+                                           placeholder="e.g. APT41 Campaign targeting local utility networks (June 2026)" required>
+                                </div>
+
+                                <div class="form-row">
+                                    <div class="form-group half-width">
+                                        <label for="classification" class="form-label">Traffic Light Protocol (TLP)</label>
+                                        <select id="classification" name="tlp_level" class="form-select" required>
+                                            <option value="" disabled selected>Select sharing level...</option>
+                                            <option value="white">TLP:WHITE (Unlimited Distribution)</option>
+                                            <option value="green">TLP:GREEN (Share within community)</option>
+                                            <option value="amber">TLP:AMBER (Share with organization only)</option>
+                                            <option value="red">TLP:RED (Highly confidential / Personal)</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group half-width">
+                                        <label for="threat-category" class="form-label">Primary Threat Category</label>
+                                        <select id="threat-category" name="category" class="form-select" required>
+                                            <option value="" disabled selected>Select category...</option>
+                                            <option value="malware">Malware / Ransomware Campaign</option>
+                                            <option value="phishing">Social Engineering / Phishing</option>
+                                            <option value="vulnerability">CVE Exploitation Audit</option>
+                                            <option value="apt">State-Sponsored APT Activities</option>
+                                            <option value="ddos">Distributed Denial of Service (DDoS)</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div class="form-row">
+                                    <div class="form-group half-width">
+                                        <label for="severity" class="form-label">Threat Severity Level</label>
+                                        <select id="severity" name="severity" class="form-select" required>
+                                            <option value="" disabled selected>Select severity...</option>
+                                            <option value="critical">Critical (Immediate Outage/Risk)</option>
+                                            <option value="high">High (Data Compromise Potential)</option>
+                                            <option value="medium">Medium (Scanning / Probe)</option>
+                                            <option value="low">Low (Information Leak / Trivial)</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group half-width">
+                                        <label for="target-sectors" class="form-label">Target Sectors / Infrastructure</label>
+                                        <input type="text" id="target-sectors" name="sectors" class="form-input" 
+                                               placeholder="e.g. Energy, Telecommunications, Finance" required>
+                                    </div>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="report-summary" class="form-label">Executive Summary & IOC Details</label>
+                                    <textarea id="report-summary" name="summary" class="form-textarea" rows="6" 
+                                              placeholder="Provide a detailed summary of findings, IP addresses, domains, hashes found, and impact assessment." required></textarea>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="file-upload" class="form-label">Attach File (PDF, JSON, PCAP, STIX, TXT)</label>
+                                    <input type="file" id="file-upload" name="report_file" class="form-file-input">
+                                    <p class="input-helper-text">Max file size: 16 MB. Supported formats: .pdf, .json, .txt, .pcap</p>
+                                </div>
+
+                                <div class="form-group form-checkbox-group">
+                                    <input type="checkbox" id="verify-data" name="verify_data" class="form-checkbox" required>
+                                    <label for="verify-data" class="form-checkbox-label">I certify that this data contains validated information and complies with sharing agreements.</label>
+                                </div>
+
+                                <div class="form-actions">
+                                    <button type="submit" class="btn btn-submit btn-primary">Upload & Register Report</button>
+                                </div>
+                            </fieldset>
+                        </form>
+                    </article>
+
+                    <!-- Guidelines Sidebar -->
+                    <aside class="guidelines-card" aria-labelledby="guidelines-heading">
+                        <header class="card-header">
+                            <h2 id="guidelines-heading" class="card-title">Submission Guidelines</h2>
+                        </header>
+                        <section class="card-body">
+                            <p>To maintain high intelligence quality, follow standard formats:</p>
+                            
+                            <h3 class="guideline-subtitle">Structured IOC Formatting</h3>
+                            <p>When pasting Indicators of Compromise (IOCs) into the summary, demarcate them using square brackets for security to prevent accidental clicks:</p>
+                            <ul>
+                                <li><strong>IP Address:</strong> <code>198[.]51[.]100[.]42</code></li>
+                                <li><strong>Domain:</strong> <code>example[.]com</code></li>
+                                <li><strong>URL:</strong> <code>hxxp://example[.]com/payload</code></li>
+                            </ul>
+
+                            <h3 class="guideline-subtitle">Accepted Formats</h3>
+                            <p>Reports containing STIX 2.1 compliance JSON data are automatically parsed and added to the live threat database stream in under 2 minutes.</p>
+
+                            <div class="status-box info-box">
+                                <strong>Need Assistance?</strong>
+                                <p>Contact the SecOps supervisor or refer to the platform wiki page for formatting guides.</p>
+                            </div>
+                        </section>
+                    </aside>
+
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- Global Platform Footer -->
+    <footer class="main-footer">
+        <div class="footer-content">
+            <p class="copyright-text">&copy; 2026 Threat Intelligence Platform. All Rights Reserved. Securing Assets Globally.</p>
+            <nav class="footer-links" aria-label="Legal Links">
+                <a href="#" class="footer-link">Privacy Policy</a>
+                <span class="separator">|</span>
+                <a href="#" class="footer-link">Terms of Service</a>
+                <span class="separator">|</span>
+                <a href="#" class="footer-link">Security Audit Logs</a>
+            </nav>
+        </div>
+    </footer>
+
+</body>
+</html>
