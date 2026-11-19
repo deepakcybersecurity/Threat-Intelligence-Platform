@@ -224,6 +224,81 @@ code, pre {
 }
 
 /* ==========================================================================
+   Home Navigation Bar - Vertical Elements Layout
+   ========================================================================== */
+.home-navbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.25rem 2rem;
+}
+
+.home-navbar .navbar-menu {
+    display: flex;
+    flex-direction: column;
+}
+
+.home-navbar .nav-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column; /* Displays navigation elements in a vertical way */
+    gap: 0.45rem;
+    padding: 0.6rem 0.85rem;
+    margin: 0;
+    min-width: 220px;
+    background: rgba(18, 26, 43, 0.85);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+    backdrop-filter: blur(10px);
+}
+
+.home-navbar .nav-list li {
+    width: 100%;
+}
+
+.home-navbar .nav-list .nav-link {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.5rem 0.9rem;
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-weight: 500;
+    font-size: 0.92rem;
+    border-radius: var(--radius-sm);
+    border: 1px solid transparent;
+    background: rgba(255, 255, 255, 0.02);
+    transition: var(--transition-all);
+}
+
+.home-navbar .nav-list .nav-link:hover {
+    color: var(--accent-cyan);
+    background: rgba(0, 229, 255, 0.08);
+    border-color: rgba(0, 229, 255, 0.25);
+    transform: translateX(4px);
+}
+
+.home-navbar .nav-list .active-link {
+    color: var(--accent-cyan);
+    background: rgba(0, 229, 255, 0.12);
+    border-color: var(--accent-cyan);
+    font-weight: 600;
+}
+
+.home-navbar .nav-list .nav-link-highlight {
+    background: var(--accent-gradient);
+    color: var(--bg-primary) !important;
+    font-weight: 600;
+    border: none;
+}
+
+.home-navbar .nav-list .nav-link-highlight:hover {
+    opacity: 0.92;
+    transform: translateX(4px);
+}
+
+/* ==========================================================================
    4. LAYOUT SIDEBAR & VIEWPORT CONTAINER
    ========================================================================== */
 .layout-container {
