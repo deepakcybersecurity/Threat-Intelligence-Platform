@@ -13,36 +13,64 @@
         src="{{ url_for('static', filename='js/1-funtioning.js') }}" defer>
     </script>
 </head>
-<body class="home-page">
+<body class="home-page has-vertical-navbar">
 
-    <!-- Top Navigation Header -->
-    <header class="main-header">
-        <nav class="navbar home-navbar" aria-label="Main Navigation">
-            <div class="navbar-brand">
-                <a href="{{ url_for('main.home') }}" class="logo-link">
-                    <span class="logo-icon">&#128737;</span>
-                    <span class="logo-text">ThreatIntel Platform</span>
-                </a>
-            </div>
+    <!-- Vertical Bar Navigation Bar -->
+    <aside class="vertical-navbar" aria-label="Main Vertical Navigation">
+        <div class="vertical-nav-brand">
+            <a href="{{ url_for('main.home') }}" class="logo-link">
+                <span class="logo-icon">&#128737;</span>
+                <div class="brand-text">
+                    <span class="logo-title">ThreatIntel</span>
+                    <span class="logo-subtitle">Platform</span>
+                </div>
+            </a>
+        </div>
 
-            <div class="navbar-menu">
-                <ul class="nav-list">
-                    <li><a href="{{ url_for('main.home') }}" class="nav-link active-link"><span class="nav-icon">&#127968;</span> Home</a></li>
-                    {% if current_user.is_authenticated and current_user.role in ['admin', 'analyst'] %}
-                        <li><a href="{{ url_for('dashboard.dashboard') }}" class="nav-link nav-link-highlight"><span class="nav-icon">&#128737;</span> Analyst Dashboard ({{ current_user.username }})</a></li>
-                        <li><a href="{{ url_for('auth.logout') }}" class="nav-link"><span class="nav-icon">&#128682;</span> Sign Out</a></li>
-                    {% else %}
-                        <li><a href="{{ url_for('auth.login') }}" class="nav-link"><span class="nav-icon">&#128273;</span> Login</a></li>
-                        <li><a href="{{ url_for('auth.register') }}" class="nav-link"><span class="nav-icon">&#128221;</span> Register</a></li>
-                        <li><a href="{{ url_for('auth.login') }}" class="nav-link nav-link-highlight"><span class="nav-icon">&#128737;</span> Analyst Dashboard</a></li>
-                    {% endif %}
-                </ul>
-            </div>
+        <nav class="vertical-nav-menu">
+            <ul class="vertical-nav-list">
+                <li>
+                    <a href="{{ url_for('main.home') }}" class="vertical-nav-link active-link">
+                        <span class="nav-icon">&#127968;</span>
+                        <span class="nav-text">Home</span>
+                    </a>
+                </li>
+                {% if current_user.is_authenticated and current_user.role in ['admin', 'analyst'] %}
+                <li>
+                    <a href="{{ url_for('dashboard.dashboard') }}" class="vertical-nav-link">
+                        <span class="nav-icon">&#128737;</span>
+                        <span class="nav-text">Dashboard</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ url_for('auth.logout') }}" class="vertical-nav-link nav-link-logout">
+                        <span class="nav-icon">&#128682;</span>
+                        <span class="nav-text">Sign Out</span>
+                    </a>
+                </li>
+                {% else %}
+                <li>
+                    <a href="{{ url_for('auth.login') }}" class="vertical-nav-link nav-link-login">
+                        <span class="nav-icon">&#128273;</span>
+                        <span class="nav-text">Login</span>
+                    </a>
+                </li>
+                {% endif %}
+            </ul>
         </nav>
-    </header>
 
-    <!-- Main Content Area -->
-    <main class="home-main-content">
+        <div class="vertical-nav-footer">
+            <div class="system-status-indicator">
+                <span class="status-dot online"></span>
+                <span class="status-label">SecOps Core Active</span>
+            </div>
+            <small class="nav-version">Threat Intel v2.4</small>
+        </div>
+    </aside>
+
+    <!-- Main Content Area with sidebar offset -->
+    <div class="home-main-wrapper">
+        <main class="home-main-content">
 
         <!-- Hero Branding Section -->
         <section class="hero-section" aria-labelledby="hero-title">
@@ -172,6 +200,7 @@
         </section>
         
     </footer>
+    </div>
 
 </body>
 </html>
