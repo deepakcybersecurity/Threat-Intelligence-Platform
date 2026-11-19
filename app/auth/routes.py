@@ -35,11 +35,11 @@ def login():
 
         # Validation
         if not email or not password:
-            flash("Email and Password are required.", "danger")
+            flash("Username/Email and Password are required.", "danger")
             return redirect(url_for("auth.login"))
 
-        # Find User
-        user = User.query.filter_by(email=email).first()
+        # Find User (accepts either corporate email or username)
+        user = User.query.filter((User.email == email) | (User.username == email)).first()
 
         if user:
             # G-4: Check if account is temporarily locked
